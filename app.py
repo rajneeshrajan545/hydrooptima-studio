@@ -10,7 +10,6 @@ st.set_page_config(page_title="Advanced Propulsion & Hydrodynamic Studio", layou
 DB_FILE = "projects.db"
 
 def init_db():
-    """Initializes the database table if it doesn't exist yet."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
@@ -32,7 +31,6 @@ def init_db():
     conn.close()
 
 def save_project(p_id, client, v_type, speed, wake, thrust, power, dwt, diam, fuel, days):
-    """Saves or updates a project profile in the SQL database."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
@@ -44,7 +42,6 @@ def save_project(p_id, client, v_type, speed, wake, thrust, power, dwt, diam, fu
     conn.close()
 
 def get_all_projects():
-    """Retrieves all saved project records for selection dropdowns."""
     conn = sqlite3.connect(DB_FILE)
     df = pd.read_sql_query("SELECT * FROM projects", conn)
     conn.close()
@@ -88,7 +85,6 @@ if check_password():
         project_list = ["New Project Configuration"] + saved_df['project_id'].tolist()
         chosen_profile = st.selectbox("Load Saved Asset Configuration Profile:", project_list)
         if chosen_profile != "New Project Configuration":
-            # Extract row from DB data frame to overwrite inputs dynamically
             p_data = saved_df[saved_df['project_id'] == chosen_profile].iloc[0]
             selected_project = p_data['project_id']
             st.success(f"Successfully loaded saved parameters for **{selected_project}**!")
@@ -96,7 +92,6 @@ if check_password():
     st.markdown("---")
     col1, col2 = st.columns([1, 2])
 
-    # Fallback/Initialization defaults mapping
     is_loaded = (selected_project != "New Project Configuration")
 
     with col1:
@@ -127,7 +122,6 @@ if check_password():
             st.markdown("---")
             st.subheader("📂 Drag & Drop Towing Tank Data")
             uploaded_file = st.file_uploader("Upload Model Test CSV Report", type=["csv"])
-            # Fall back to baseline values if no file dropped yet
             v_knots = float(p_data['speed']) if is_loaded else 13.0
             w_fraction = float(p_data['wake_fraction']) if is_loaded else 0.296
             t_deduction = float(p_data['thrust_deduction']) if is_loaded else 0.201
@@ -158,7 +152,6 @@ if check_password():
         fuel_cost = st.number_input("VLSFO Fuel Cost (USD / Metric Ton)", value=fuel_val)
         op_days = st.number_input("Annual Days at Sea", value=days_val)
 
-        # COMMIT TO ARCHIVE BUTTON
         st.markdown("---")
         if st.button("💾 Commit Current Parameters to Database"):
             save_project(vessel_id, client_name, vessel_type, v_knots, w_fraction, t_deduction, baseline_power, vessel_dwt, diameter, fuel_cost, op_days)
@@ -207,7 +200,8 @@ if check_password():
             px = r * (diameter/2) * np.cos(theta)
             py = r * (diameter/2) * np.sin(theta) * p
             pz = np.full_like(px, r * (diameter/2))
-            fig3d.add_trace(go.Scatter3d(x=px, y=py, pz=pz, mode='lines', line=dict(color='orange', width=4), showlegend=False))
+            # FIXED PARAMETER HERE (Changed pz=pz to z=pz)
+            fig3d.add_trace(go.Scatter3d(x=px, y=py, z=pz, mode='lines', line=dict(color='orange', width=4), showlegend=False))
 
         rudder_z = np.linspace(0, 8.5, 10)
         rudder_x = np.sin(np.linspace(-np.pi/2, np.pi/2, 10)) * (6.5 * (v_knots / 13.0) / 10)
@@ -217,31 +211,4 @@ if check_password():
                             scene=dict(xaxis_title="X (Trans)", yaxis_title="Y (Flow)", zaxis_title="Z (Span)"))
         st.plotly_chart(fig3d, use_container_width=True)
 
-        st.markdown("---")
-        st.subheader("📉 IMO CII Regulatory Life-Extension Timeline")
-
-        years = np.array([2026, 2027, 2028, 2029, 2030])
-        cii_required_c = np.array([cii_baseline * 0.95, cii_baseline * 0.91, cii_baseline * 0.87, cii_baseline * 0.83, cii_baseline * 0.79])
-        cii_required_e = cii_required_c * 1.15
-
-        fig_cii = go.Figure()
-        fig_cii.add_trace(go.Scatter(x=years, y=cii_required_c, mode='lines', name='Target Profile Threshold (C-Rating)', line=dict(color='green', dash='dash')))
-        fig_cii.add_trace(go.Scatter(x=years, y=cii_required_e, mode='lines', name='Critical Violation Boundary (E-Rating)', line=dict(color='red', dash='dash')))
-        fig_cii.add_trace(go.Scatter(x=years, y=[cii_baseline]*5, mode='lines+markers', name='Unmodified Status Quo', line=dict(color='crimson', width=3)))
-        fig_cii.add_trace(go.Scatter(x=years, y=[cii_optimized]*5, mode='lines+markers', name='With HydroOptima Integration', line=dict(color='limegreen', width=4)))
-
-        fig_cii.update_layout(template="plotly_dark", height=300, margin=dict(l=40, r=20, b=30, t=20),
-                            xaxis=dict(tickmode='array', tickvals=years), yaxis_title="Attained CII (g-CO2 / DWT-Mile)",
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(fig_cii, use_container_width=True)
-
-        st.success(f"⚖️ **Compliance Advantage:** Integrating the custom twisted rudder bulb saves approximately **{annual_co2_saved:.1f} tons** of carbon emissions annually, securely extending structural fleet viability through **2030**.")
-
-        st.markdown("---")
-        st.subheader("🛠️ Production-Ready Data Export")
-
-        csv_data = f"# HYDROOPTIMA AI STUDIO - GEOMETRY PACKAGE\n# CLIENT: {client_name} | ID: {vessel_id}\n"
-        clean_file_name = f"{vessel_id.replace(' ', '_')}_HydroOptima_Design.xyz"
-        st.download_button(label="📥 Export .XYZ Production Coordinate Package", data=csv_data, file_name=clean_file_name, mime="text/plain")
-
-    st.write("\n--- Proprietary Engineering Asset Toolchain | Powered by HydroOptima AI ---")
+        st
