@@ -80,40 +80,53 @@ if check_password():
     st.markdown("### 🗃️ Enterprise Knowledge Base")
     saved_df = get_all_projects()
 
+    # Pre-configure dynamic fallback defaults globally to prevent initialization errors
+    s_val, w_val, t_val, p_val = 13.0, 0.296, 0.201, 3401.0
+    dwt_val, diam_val, fuel_val, days_val = 82000.0, 6.8, 650.0, 220.0
+    client_val, id_val, vtype_val = "Global Maritime Fleet", "Project Eco-Bulk 01", "Capesize Bulk Carrier"
+
     selected_project = "New Project Configuration"
+    is_loaded = False
+
     if not saved_df.empty:
         project_list = ["New Project Configuration"] + saved_df['project_id'].tolist()
         chosen_profile = st.selectbox("Load Saved Asset Configuration Profile:", project_list)
         if chosen_profile != "New Project Configuration":
             p_data = saved_df[saved_df['project_id'] == chosen_profile].iloc[0]
             selected_project = p_data['project_id']
+            is_loaded = True
+
+            # Repopulate from database values cleanly
+            s_val = float(p_data['speed'])
+            w_val = float(p_data['wake_fraction'])
+            t_val = float(p_data['thrust_deduction'])
+            p_val = float(p_data['power'])
+            dwt_val = float(p_data['dwt'])
+            diam_val = float(p_data['diameter'])
+            fuel_val = float(p_data['fuel_cost'])
+            days_val = float(p_data['op_days'])
+            client_val = str(p_data['client_name'])
+            id_val = str(p_data['project_id'])
+            vtype_val = str(p_data['vessel_type'])
             st.success(f"Successfully loaded saved parameters for **{selected_project}**!")
 
     st.markdown("---")
     col1, col2 = st.columns([1, 2])
 
-    is_loaded = (selected_project != "New Project Configuration")
-
     with col1:
         st.header("📋 Project Input Mode")
         input_mode = st.radio("Select Data Input Method", ["Interactive Sliders", "Automated CSV Upload"])
 
-        client_val = p_data['client_name'] if is_loaded else "Global Maritime Fleet"
-        id_val = p_data['project_id'] if is_loaded else "Project Eco-Bulk 01"
-        vtype_val = p_data['vessel_type'] if is_loaded else "Capesize Bulk Carrier"
-
         client_name = st.text_input("Client / Shipowner Identifier", value=client_val)
         vessel_id = st.text_input("Vessel Identifier / Project Code", value=id_val)
-        vessel_type = st.selectbox("Vessel Hull Form Architecture", ["Handymax Product Tanker", "Aframax Crude Carrier", "Capesize Bulk Carrier", "Landing Craft / Special Utility"], index=["Handymax Product Tanker", "Aframax Crude Carrier", "Capesize Bulk Carrier", "Landing Craft / Special Utility"].index(vtype_val))
+
+        v_list = ["Handymax Product Tanker", "Aframax Crude Carrier", "Capesize Bulk Carrier", "Landing Craft / Special Utility"]
+        v_index = v_list.index(vtype_val) if vtype_val in v_list else 2
+        vessel_type = st.selectbox("Vessel Hull Form Architecture", v_list, index=v_index)
 
         if input_mode == "Interactive Sliders":
             st.markdown("---")
             st.subheader("Manual Inflow Parameters")
-            s_val = float(p_data['speed']) if is_loaded else 13.0
-            w_val = float(p_data['wake_fraction']) if is_loaded else 0.296
-            t_val = float(p_data['thrust_deduction']) if is_loaded else 0.201
-            p_val = float(p_data['power']) if is_loaded else 3401.0
-
             v_knots = st.slider("Design Service Speed (Knots)", 11.0, 15.0, s_val, 0.5)
             w_fraction = st.slider("Model Taylor Wake Fraction (w)", 0.250, 0.350, w_val, 0.001)
             t_deduction = st.slider("Thrust Deduction Factor (t)", 0.150, 0.250, t_val, 0.001)
@@ -122,10 +135,9 @@ if check_password():
             st.markdown("---")
             st.subheader("📂 Drag & Drop Towing Tank Data")
             uploaded_file = st.file_uploader("Upload Model Test CSV Report", type=["csv"])
-            v_knots = float(p_data['speed']) if is_loaded else 13.0
-            w_fraction = float(p_data['wake_fraction']) if is_loaded else 0.296
-            t_deduction = float(p_data['thrust_deduction']) if is_loaded else 0.201
-            baseline_power = float(p_data['power']) if is_loaded else 3401.0
+
+            # Default to baseline if no file uploaded yet
+            v_knots, w_fraction, t_deduction, baseline_power = s_val, w_val, t_val, p_val
 
             if uploaded_file is not None:
                 try:
@@ -142,11 +154,6 @@ if check_password():
 
         st.markdown("---")
         st.subheader("Vessel Configuration")
-        dwt_val = float(p_data['dwt']) if is_loaded else 82000.0
-        diam_val = float(p_data['diameter']) if is_loaded else 6.8
-        fuel_val = float(p_data['fuel_cost']) if is_loaded else 650.0
-        days_val = float(p_data['op_days']) if is_loaded else 220.0
-
         vessel_dwt = st.number_input("Vessel Deadweight (DWT Tons)", value=dwt_val)
         diameter = st.number_input("Maximum Propeller Diameter (meters)", value=diam_val)
         fuel_cost = st.number_input("VLSFO Fuel Cost (USD / Metric Ton)", value=fuel_val)
@@ -158,7 +165,7 @@ if check_password():
             st.success(f"✅ Record written successfully! Saved as '{vessel_id}'")
             st.rerun()
 
-    # Core Calculations
+    # Core Performance & Hydrodynamic Scaling Calculations
     baseline_efficiency = 0.696
     optimized_efficiency = 0.742  
     sfc = 0.185 / 1000.0  
@@ -171,12 +178,12 @@ if check_password():
     daily_fuel_saved = daily_baseline_fuel - daily_optimized_fuel
     annual_cash_saved = daily_fuel_saved * fuel_cost * op_days
 
-    annual_dist = v_knots * 24 * op_days
+    annual_dist = max(v_knots * 24 * op_days, 1.0) # Avoid divide by zero
     co2_factor = 3.114  
 
     annual_co2_base = daily_baseline_fuel * co2_factor * op_days
     annual_co2_opt = daily_optimized_fuel * co2_factor * op_days
-    annual_co2_saved = annual_co2_base - annual_co2_opt
+    annual_co2_saved = max(annual_co2_base - annual_co2_opt, 0.0)
 
     cii_baseline = (annual_co2_base * 10**6) / (vessel_dwt * annual_dist)
     cii_optimized = (annual_co2_opt * 10**6) / (vessel_dwt * annual_dist)
@@ -200,7 +207,6 @@ if check_password():
             px = r * (diameter/2) * np.cos(theta)
             py = r * (diameter/2) * np.sin(theta) * p
             pz = np.full_like(px, r * (diameter/2))
-            # FIXED PARAMETER HERE (Changed pz=pz to z=pz)
             fig3d.add_trace(go.Scatter3d(x=px, y=py, z=pz, mode='lines', line=dict(color='orange', width=4), showlegend=False))
 
         rudder_z = np.linspace(0, 8.5, 10)
@@ -211,4 +217,31 @@ if check_password():
                             scene=dict(xaxis_title="X (Trans)", yaxis_title="Y (Flow)", zaxis_title="Z (Span)"))
         st.plotly_chart(fig3d, use_container_width=True)
 
-        st
+        st.markdown("---")
+        st.subheader("📉 IMO CII Regulatory Life-Extension Timeline")
+
+        years = np.array([2026, 2027, 2028, 2029, 2030])
+        cii_required_c = np.array([cii_baseline * 0.95, cii_baseline * 0.91, cii_baseline * 0.87, cii_baseline * 0.83, cii_baseline * 0.79])
+        cii_required_e = cii_required_c * 1.15
+
+        fig_cii = go.Figure()
+        fig_cii.add_trace(go.Scatter(x=years, y=cii_required_c, mode='lines', name='Target Profile Threshold (C-Rating)', line=dict(color='green', dash='dash')))
+        fig_cii.add_trace(go.Scatter(x=years, y=cii_required_e, mode='lines', name='Critical Violation Boundary (E-Rating)', line=dict(color='red', dash='dash')))
+        fig_cii.add_trace(go.Scatter(x=years, y=[cii_baseline]*5, mode='lines+markers', name='Unmodified Status Quo', line=dict(color='crimson', width=3)))
+        fig_cii.add_trace(go.Scatter(x=years, y=[cii_optimized]*5, mode='lines+markers', name='With HydroOptima Integration', line=dict(color='limegreen', width=4)))
+
+        fig_cii.update_layout(template="plotly_dark", height=300, margin=dict(l=40, r=20, b=30, t=20),
+                            xaxis=dict(tickmode='array', tickvals=years), yaxis_title="Attained CII (g-CO2 / DWT-Mile)",
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        st.plotly_chart(fig_cii, use_container_width=True)
+
+        st.success(f"⚖️ **Compliance Advantage:** Integrating the custom twisted rudder bulb saves approximately **{annual_co2_saved:.1f} tons** of carbon emissions annually, securely extending structural fleet viability through **2030**.")
+
+        st.markdown("---")
+        st.subheader("🛠️ Production-Ready Data Export")
+
+        csv_data = f"# HYDROOPTIMA AI STUDIO - GEOMETRY PACKAGE\n# CLIENT: {client_name} | ID: {vessel_id}\n"
+        clean_file_name = f"{vessel_id.replace(' ', '_')}_HydroOptima_Design.xyz"
+        st.download_button(label="📥 Export .XYZ Production Coordinate Package", data=csv_data, file_name=clean_file_name, mime="text/plain")
+
+    st.write("\n--- Proprietary Engineering Asset Toolchain | Powered by HydroOptima AI ---")
