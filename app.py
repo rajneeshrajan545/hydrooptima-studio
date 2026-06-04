@@ -313,7 +313,7 @@ if check_password():
 
         st.markdown("---")
         st.subheader("🔮 Real-Time Universal Shaded Production Preview")
-        st.write("渲染出的实体曲面：客户端可以清晰看到高空化螺旋桨叶片与扭曲翼形舵体之间的物理空间位置。")
+st.write("Solid-surface render: Clients can clearly visualize the physical spatial positioning of the anti-cavitation propeller blades and the twisted foil rudder assembly.")
 
         # --- NEW SOLID-SURFACE RENDER CONVERTER BLOCK ---
         fig3d = go.Figure()
