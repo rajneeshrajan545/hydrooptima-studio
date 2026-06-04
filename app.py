@@ -376,9 +376,24 @@ if check_password():
         rpm_blade_modifier = 1.0 - (0.075 * (blade_count - 4))
         estimated_rpm = ((v_advance * 60) / (diameter * 0.65)) * rpm_blade_modifier
         
-        # 2. Now calculate the Cavitation/Torque metrics
-        J_current = v_advance / ((estimated_rpm/60.0) * diameter)
-        Kt_current = baseline_power / (1025 * (estimated_rpm/60.0)**3 * (diameter**5))
+       # --- DYNAMIC CAVITATION & TORQUE MATRIX (UPDATED FOR AUTOPILOT) ---
+        st.markdown("---")
+        st.subheader("⚠️ Cavitation & Torque Matrix")
+        
+        # USE AUTOPILOT VALUES IF ACTIVE, ELSE USE SLIDER VALUES
+        calc_diam = optimized_diameter if auto_optimize else diameter
+        calc_blades = optimized_blades if auto_optimize else blade_count
+        calc_span = optimized_span if auto_optimize else rudder_span
+        calc_chord = optimized_chord if auto_optimize else rudder_chord
+        calc_thick = optimized_thickness if auto_optimize else naca_thickness
+        
+        # Calculate Current Operational Point
+        v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
+        # Using the active diameter for RPM estimation
+        estimated_rpm = ((v_advance * 60) / (calc_diam * 0.65)) * (1.0 - (0.075 * (calc_blades - 4)))
+        
+        J_current = v_advance / ((estimated_rpm/60.0) * calc_diam)
+        Kt_current = baseline_power / (1025 * (estimated_rpm/60.0)**3 * (calc_diam**5))
         
         J_lim, Kt_lim = get_cavitation_bucket_data()
         
@@ -389,11 +404,9 @@ if check_password():
                             xaxis_title="Advance Ratio (J)", yaxis_title="Thrust Coefficient (Kt)")
         st.plotly_chart(fig_b, use_container_width=True)
         
-        # 3. Torque calculation
-        torque = 0.5 * 1025 * (v_knots * 0.5144)**2 * (rudder_chord**2) * rudder_span * 0.05 * naca_thickness
+        # Torque calculation using active design dimensions
+        torque = 0.5 * 1025 * (v_knots * 0.5144)**2 * (calc_chord**2) * calc_span * 0.05 * calc_thick
         st.metric("Estimated Rudder Stock Torque (kNm)", f"{torque/1000:.1f}")
-        # --- DYNAMIC BLADE-RPM CAVITATION COUPLING ENGINE ---
-        st.markdown("### ⚠️ Hydrodynamic Stability & Cavitation Matrix")
 
         v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
         rpm_blade_modifier = 1.0 - (0.075 * (blade_count - 4))
