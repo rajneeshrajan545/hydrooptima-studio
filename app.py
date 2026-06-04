@@ -257,7 +257,6 @@ if check_password():
 
     cii_reference_baseline = a_coeff * (capacity_factor ** (-c_coeff))
 
-    # Calibrate scale weights natively
     cii_baseline = ((annual_co2_base * 10**6) / (capacity_factor * annual_dist)) * 2.30
     cii_optimized = ((annual_co2_opt * 10**6) / (capacity_factor * annual_dist)) * 2.30
 
@@ -284,32 +283,34 @@ if check_password():
                             scene=dict(xaxis_title="X (Chord/Trans)", yaxis_title="Y (Thickness)", zaxis_title="Z (Span Height)"))
         st.plotly_chart(fig3d, use_container_width=True)
 
-        # --- NEW MODULE: MULTI-BLADE CAVITATION ALERT MATRIX ---
+        # --- FIXED MODULE: DYNAMIC INTELLIGENT CAVITATION MATRIX ---
         st.markdown("### ⚠️ Hydrodynamic Stability & Cavitation Matrix")
 
-        # 1. Standard Propeller Rotation Estimation Loop (RPM calculation)
-        # Empirical approximation based on diameter and advance velocity scaling
         v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
         estimated_rpm = (v_advance * 60) / (diameter * 0.65)
         rps = estimated_rpm / 60.0
-
-        # 2. Tip Speed Velocity Equation: V_tip = pi * D * n
         tip_speed = np.pi * diameter * rps
 
         st.write(f"**Calculated Propeller Tip Speed:** `{tip_speed:.1f} m/s` | **Estimated Operational Shaft Rotation:** `{estimated_rpm:.1f} RPM`")
 
-        # Render dynamic threshold condition cards
         c1, c2 = st.columns(2)
         with c1:
             if tip_speed < 36.0:
                 st.success("🟢 **Tip Velocity Boundary: SAFE**\n\nLocal shear velocities sit securely below cavitation limits. Low risk of structural pressure pulses.")
             elif tip_speed <= 43.0:
-                st.warning("🟡 **Tip Velocity Boundary: MARGINAL EROSION RISK**\n\nTip velocities crossing into the transition zone. Minor sheet cavitation likely at top quadrant position. Consider shifting to a 5-blade profile to reduce required loading diameter.")
+                # --- DYNAMIC ADVICE LOGIC INTEGRATED HERE ---
+                if blade_count < 5:
+                    advice_text = "Consider shifting to a 5 or 6-blade profile to reduce required loading diameter and drop local tip velocities."
+                elif blade_count == 5:
+                    advice_text = "Already optimized to 5 blades. Consider a minor reduction in tip diameter or drop maximum service speed by 0.5 knots to clear transition thresholds."
+                else:
+                    advice_text = "Already utilizing a high-solidity 6-blade configuration. To lower tip speed further, slightly decrease total propeller tip diameter or verify blade sections feature anti-cavitation trailing edge details."
+
+                st.warning(f"🟡 **Tip Velocity Boundary: MARGINAL EROSION RISK**\n\nTip velocities crossing into the transition zone. Minor sheet cavitation likely at top quadrant position. {advice_text}")
             else:
-                st.error("🔴 **Tip Velocity Boundary: CAVITATION CRITICAL**\n\nSevere localized boiling threshold exceeded! High potential for surface pitting, blade material erosion, and severe hull vibration noise.")
+                st.error("🔴 **Tip Velocity Boundary: CAVITATION CRITICAL**\n\nSevere localized boiling threshold exceeded! High potential for surface pitting, blade material erosion, and severe hull vibration noise. Reduce design speed, power density, or decrease diameter.")
 
         with c2:
-            # Burrill loading area safety scaling index check
             loading_index = (baseline_power) / (blade_count * (diameter**2))
             if loading_index < 125.0:
                 st.success("🟢 **Surface Blade Loading Profile: OPTIMAL**\n\nExpanded blade surface area ratios are perfectly sufficient to support localized thrust fields safely.")
