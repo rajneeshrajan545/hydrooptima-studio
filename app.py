@@ -161,7 +161,6 @@ if check_password():
     st.markdown("### 🗃️ Enterprise Knowledge Base")
     saved_df = get_all_projects()
 
-    # Structural default values configuration
     s_val, w_val, t_val, p_val = 13.0, 0.296, 0.201, 3401.0
     dwt_val, diam_val, fuel_val, days_val = 82000.0, 6.8, 650.0, 220.0
     b_count, h_ratio, p_law = 4, 0.22, "Parabolic (Reduced Tip & Hub Loading)"
@@ -202,7 +201,6 @@ if check_password():
         v_index = v_list.index(vtype_val) if vtype_val in v_list else 0
         vessel_type = st.selectbox("Vessel Hull Form Classification (CII Reference Mode)", v_list, index=v_index)
 
-        # --- AUTOMATED DATA OVERWRITE PARSING MODULE ---
         if input_mode == "Automated CSV Upload":
             st.markdown("---")
             st.subheader("📂 Drag & Drop Towing Tank Spreadsheet")
@@ -212,8 +210,6 @@ if check_password():
                 try:
                     csv_df = pd.read_csv(uploaded_file)
                     st.success("🎯 Towing tank file parsed successfully!")
-
-                    # Map structural keys if present in CSV columns
                     if 'Speed' in csv_df.columns: s_val = float(csv_df['Speed'].iloc[0])
                     if 'Wake' in csv_df.columns: w_val = float(csv_df['Wake'].iloc[0])
                     if 'Thrust_Deduction' in csv_df.columns: t_val = float(csv_df['Thrust_Deduction'].iloc[0])
@@ -222,12 +218,10 @@ if check_password():
                     if 'Diameter' in csv_df.columns: diam_val = float(csv_df['Diameter'].iloc[0])
                     if 'Blades' in csv_df.columns: b_count = int(csv_df['Blades'].iloc[0])
                     if 'SFOC' in csv_df.columns: sfoc_default = float(csv_df['SFOC'].iloc[0])
-
                     st.info(f"💡 AI Overwrite Loaded: Speed={s_val}kn | Power={p_val}kW | Blades={b_count}Z | SFOC={sfoc_default}g")
                 except Exception as e:
                     st.error(f"Failed to extract structured CSV data: {e}")
             else:
-                # Direct format template instructions block
                 st.warning("ℹ️ Formatting Guide: Ensure your CSV file includes row headers named exactly: 'Speed', 'Wake', 'Thrust_Deduction', 'Power', 'DWT', 'Diameter', 'Blades', 'SFOC'.")
 
         st.markdown("---")
@@ -263,12 +257,25 @@ if check_password():
             st.success(f"✅ Universal profile recorded safely with engine SFOC metrics! Saved as '{vessel_id}'")
             st.rerun()
 
-    # --- HYDRODYNAMIC & REGULATORY REAL-WORLD CO2 SCALING BACKEND ---
+    # --- HYDRODYNAMIC DYNAMIC ENERGY RECOVERY BACKEND ---
     base_prop_eff = 0.68 + (0.02 * (4 - blade_count))
-    opt_prop_eff = base_prop_eff + 0.045  
+
+    # DYNAMIC RUDDER COUPLING LOGIC
+    # Calculate dimensional rudder plane surface aspect area (Span * Chord)
+    rudder_area = rudder_span * rudder_chord
+
+    # 1. Swirl Energy Recovery Factor (Lift benefit scaled by surface area)
+    swirl_recovery_gain = 0.0018 * rudder_area * (1.1 if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.8)
+
+    # 2. Parasitic Skin-Friction Form Drag Penalty (Thicker / larger rudders oppose movement)
+    rudder_drag_penalty = 0.0035 * rudder_area * (naca_thickness / 0.18)
+
+    # Core resulting propulsive delta combined dynamically
+    rudder_efficiency_gain = max(swirl_recovery_gain - rudder_drag_penalty, 0.01)
+
+    opt_prop_eff = base_prop_eff + rudder_efficiency_gain
 
     sfc_tons = sfoc_input / 1000.0 / 1000.0  
-
     daily_baseline_fuel = baseline_power * 24 * sfc_tons
     daily_optimized_fuel = (baseline_power * (base_prop_eff / opt_prop_eff)) * 24 * sfc_tons
 
@@ -325,6 +332,7 @@ if check_password():
         tip_speed = np.pi * diameter * rps
 
         st.write(f"**Calculated Propeller Tip Speed:** `{tip_speed:.1f} m/s` | **Estimated Operational Shaft Rotation:** `{estimated_rpm:.1f} RPM`")
+        st.write(f"ℹ️ **Current Active Rudder Net Efficiency Lift Coefficient:** `+{rudder_efficiency_gain*100:.2f}%` total propulsive benefit.")
 
         c1, c2 = st.columns(2)
         with c1:
