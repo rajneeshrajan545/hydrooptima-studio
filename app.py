@@ -257,24 +257,19 @@ if check_password():
             st.success(f"✅ Universal profile recorded safely with engine SFOC metrics! Saved as '{vessel_id}'")
             st.rerun()
 
-    # --- HYDRODYNAMIC DYNAMIC ENERGY RECOVERY BACKEND ---
+    # --- 🔒 ALL CRITICAL FLUID DYNAMICS CALCULATIONS POSITIONED AFTER INPUT CAPTURE ---
     base_prop_eff = 0.68 + (0.02 * (4 - blade_count))
-
-    # CALCULATE REFACTORED LIFTING VELOCITY COUPLINGS
     rudder_area = rudder_span * rudder_chord
 
-    # Swirl energy recovery vector scaled dynamically to the dimensional area bounds
+    # Process lift and drag parameters using active slider components
     swirl_recovery_gain = 0.0035 * rudder_area * (1.25 if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.85)
     rudder_drag_penalty = 0.0048 * rudder_area * (naca_thickness / 0.18)
-
-    # Combined propulsive improvement delta
     rudder_efficiency_gain = max(swirl_recovery_gain - rudder_drag_penalty, 0.012)
+
     opt_prop_eff = base_prop_eff + rudder_efficiency_gain
 
     sfc_tons = sfoc_input / 1000.0 / 1000.0  
     daily_baseline_fuel = baseline_power * 24 * sfc_tons
-
-    # HARD-LINK RECALCULATION LAYER: Force metrics to rely directly on opt_prop_eff ratios
     daily_optimized_fuel = (baseline_power * (base_prop_eff / opt_prop_eff)) * 24 * sfc_tons
 
     daily_fuel_saved = max(daily_baseline_fuel - daily_optimized_fuel, 0.0)
@@ -287,7 +282,6 @@ if check_password():
     annual_co2_opt = daily_optimized_fuel * co2_factor * op_days
     annual_co2_saved = max(annual_co2_base - annual_co2_opt, 0.0)
 
-    # --- PURE PHYSICAL IMO DATA ALIGNMENT FOR THE TRACKING SCALES ---
     capacity_factor = vessel_dwt if vessel_type != "LNG Carrier" else vessel_dwt * 0.48
     a_coeff, c_coeff = get_imo_parameters(vessel_type, capacity_factor)
     cii_reference_baseline = a_coeff * (capacity_factor ** (-c_coeff))
@@ -298,26 +292,9 @@ if check_password():
     with col2:
         st.header("📊 Executive Optimization Summary")
         m1, m2, m3 = st.columns(3)
-        # Metrics now update instantaneously based on dynamic formulas
-        st.markdown(
-            f"""
-            <div style="display: flex; justify-content: space-between; background-color: #1e1e1e; padding: 15px; border-radius: 10px;">
-                <div style="text-align: center; flex: 1;">
-                    <p style="color: #888888; margin: 0; font-size: 14px;">Daily Fuel Consumption Drop</p>
-                    <h2 style="color: #4CAF50; margin: 5px 0;">{daily_fuel_saved:.2f} Tons/Day</h2>
-                </div>
-                <div style="text-align: center; flex: 1; border-left: 1px solid #333; border-right: 1px solid #333;">
-                    <p style="color: #888888; margin: 0; font-size: 14px;">Annual OPEX Savings</p>
-                    <h2 style="color: #2196F3; margin: 5px 0;">${annual_cash_saved:,.2f} USD</h2>
-                </div>
-                <div style="text-align: center; flex: 1;">
-                    <p style="color: #888888; margin: 0; font-size: 14px;">CII Carbon Reduction Impact</p>
-                    <h2 style="color: #FF9800; margin: 5px 0;">{annual_co2_saved:.1f} Tons/Yr</h2>
-                </div>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
+        m1.metric(label="Daily Fuel Consumption Drop", value=f"{daily_fuel_saved:.2f} Tons/Day")
+        m2.metric(label="Annual OPEX Savings", value=f"${annual_cash_saved:,.2f} USD")
+        m3.metric(label="CII Carbon Reduction Impact", value=f"{annual_co2_saved:.1f} Tons/Yr")
 
         st.markdown("---")
         st.subheader("🔮 Real-Time Universal Geometry Preview")
