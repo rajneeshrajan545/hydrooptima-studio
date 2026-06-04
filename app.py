@@ -152,7 +152,7 @@ if check_password():
     st.markdown("### 🗃️ Enterprise Knowledge Base")
     saved_df = get_all_projects()
 
-    # Global default initializations including the new sfoc variable
+    # Global default initializations
     s_val, w_val, t_val, p_val = 13.0, 0.296, 0.201, 3401.0
     dwt_val, diam_val, fuel_val, days_val = 82000.0, 6.8, 650.0, 220.0
     b_count, h_ratio, p_law = 4, 0.22, "Parabolic (Reduced Tip & Hub Loading)"
@@ -176,7 +176,6 @@ if check_password():
             b_count, h_ratio, p_law = int(p_data['blade_count']), float(p_data['hub_ratio']), str(p_data['pitch_law'])
             r_type, r_span, r_chord, r_thick = str(p_data['rudder_type']), float(p_data['rudder_span']), float(p_data['rudder_chord']), float(p_data['naca_thickness'])
             client_val, id_val, vtype_val = str(p_data['client_name']), str(p_data['project_id']), str(p_data['vessel_type'])
-            # Safeguard parsing for older rows that didn't have SFOC columns initialized
             sfoc_default = float(p_data['sfoc']) if 'sfoc' in p_data else 185.0
             st.success(f"Successfully loaded parameters for saved profile: **{selected_project}**!")
 
@@ -214,7 +213,6 @@ if check_password():
         t_deduction = st.slider("Thrust Deduction Factor (t)", 0.100, 0.300, t_val, 0.001)
 
         baseline_power = st.number_input("Baseline Installed Shaft Power (kW)", value=p_val)
-        # ADD INTERACTIVE VARIABLE SFOC ENTRY HERE
         sfoc_input = st.number_input("Specific Fuel Oil Consumption - SFOC (g/kW-h)", value=sfoc_default, step=1.0)
 
         fuel_cost = st.number_input("Fuel Cost (USD / Metric Ton)", value=fuel_val)
@@ -226,15 +224,16 @@ if check_password():
             st.success(f"✅ Universal profile recorded safely with engine SFOC metrics! Saved as '{vessel_id}'")
             st.rerun()
 
-    # Core Performance & Hydrodynamic Scaling Calculations using CUSTOM sfoc_input
-    baseline_efficiency = 0.68 + (0.02 * (4 - blade_count))
-    optimized_efficiency = baseline_efficiency + 0.046  
-    sfc = sfoc_input / 1000.0 / 1000.0  # Convert g/kW-h cleanly to Metric Tons/kW-h
+    # --- REFINED MATHEMATICAL BACKEND ENGINE ---
+    # Hydrodynamic baseline scaling rules
+    base_prop_eff = 0.68 + (0.02 * (4 - blade_count))
+    opt_prop_eff = base_prop_eff + 0.045  # Hull optimization integration benefit delta
 
-    daily_baseline_fuel = baseline_power * 24 * sfc
-    efficiency_ratio = baseline_efficiency / optimized_efficiency
-    optimized_power = baseline_power * efficiency_ratio
-    daily_optimized_fuel = optimized_power * 24 * sfc
+    sfc_tons = sfoc_input / 1000.0 / 1000.0  # Convert g/kW-h cleanly to Metric Tons/kW-h
+
+    # Calculate consumption streams independently
+    daily_baseline_fuel = baseline_power * 24 * sfc_tons
+    daily_optimized_fuel = (baseline_power * (base_prop_eff / opt_prop_eff)) * 24 * sfc_tons
 
     daily_fuel_saved = max(daily_baseline_fuel - daily_optimized_fuel, 0.0)
     annual_cash_saved = daily_fuel_saved * fuel_cost * op_days
@@ -246,10 +245,12 @@ if check_password():
     annual_co2_opt = daily_optimized_fuel * co2_factor * op_days
     annual_co2_saved = max(annual_co2_base - annual_co2_opt, 0.0)
 
-    # --- CALIBRATED MARITIME SCALING FOR CII METRICS ---
+    # Calculate explicit, completely split cargo scaling metrics
     capacity_factor = vessel_dwt if vessel_type != "LNG Carrier" else vessel_dwt * 0.48
+
+    # Force separated mathematical calculations for the graph vectors
     cii_baseline = (annual_co2_base * 10**6) / (capacity_factor * annual_dist)
-    cii_optimized = cii_baseline * (daily_optimized_fuel / daily_baseline_fuel)
+    cii_optimized = (annual_co2_opt * 10**6) / (capacity_factor * annual_dist)
 
     a_coeff, c_coeff = get_imo_parameters(vessel_type)
     cii_reference_baseline = a_coeff * (capacity_factor ** (-c_coeff))
@@ -283,6 +284,7 @@ if check_password():
 
         years = np.array([2026, 2027, 2028, 2029, 2030])
         reduction_factors = np.array([0.05, 0.07, 0.09, 0.11, 0.13])
+
         cii_required_c = cii_reference_baseline * (1.0 - reduction_factors)
         cii_required_e = cii_required_c * 1.28
 
@@ -290,12 +292,13 @@ if check_password():
         fig_cii.add_trace(go.Scatter(x=years, y=cii_required_c, mode='lines', name='IMO Target Line (C-Rating Threshold)', line=dict(color='orange', dash='dash')))
         fig_cii.add_trace(go.Scatter(x=years, y=cii_required_e, mode='lines', name='IMO Boundary Line (Critical E-Violation)', line=dict(color='red', dash='dash')))
 
+        # Render the calculated split paths with true delta values
         fig_cii.add_trace(go.Scatter(x=years, y=[cii_baseline]*5, mode='lines+markers', name='Unmodified Status Quo', line=dict(color='crimson', width=3)))
         fig_cii.add_trace(go.Scatter(x=years, y=[cii_optimized]*5, mode='lines+markers', name='With Optimized Integration', line=dict(color='limegreen', width=4)))
 
         fig_cii.update_layout(template="plotly_dark", height=320, margin=dict(l=40, r=20, b=30, t=20),
                             xaxis=dict(tickmode='array', tickvals=years), yaxis_title="Attained CII (g-CO2 / DWT-Mile)",
-                            legend=dict(orientation="h", yanchor="bottom", y=102, xanchor="right", x=1))
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_cii, use_container_width=True)
 
         st.success(f"⚖️ **Compliance Advantage:** Integrating the optimized design package cuts carbon emissions by **{annual_co2_saved:.1f} tons** annually, directly improving the vessel's attained operational rating curve relative to official IMO parameters.")
