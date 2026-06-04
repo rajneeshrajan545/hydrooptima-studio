@@ -131,7 +131,11 @@ def generate_universal_propeller(diameter, hub_ratio, blades, pitch_law, wake_fr
             z_coords.extend(pz)
 
     return np.array(x_coords), np.array(y_coords), np.array(z_coords)
-
+def get_cavitation_bucket_data():
+    J = np.linspace(0.3, 1.2, 50)
+    Kt = 0.08 * (J - 0.2)**2 + 0.02
+    return J, Kt
+    
 # --- SECURITY ENTRY PORTAL ---
 def check_password():
     if "password_correct" not in st.session_state:
@@ -362,6 +366,28 @@ if check_password():
         fig3d.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, b=0, t=0),
                             scene=dict(xaxis_title="X (Chord/Trans)", yaxis_title="Y (Thickness)", zaxis_title="Z (Span Height)"))
         st.plotly_chart(fig3d, use_container_width=True)
+
+        # --- NEW: CAVITATION & TORQUE MATRIX ---
+        st.markdown("---")
+        st.subheader("⚠️ Cavitation & Torque Matrix")
+        
+        # Calculate Current Operational Point
+        v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
+        J_current = v_advance / ((estimated_rpm/60.0) * diameter)
+        Kt_current = baseline_power / (1025 * (estimated_rpm/60.0)**3 * (diameter**5))
+        
+        J_lim, Kt_lim = get_cavitation_bucket_data()
+        
+        fig_b = go.Figure()
+        fig_b.add_trace(go.Scatter(x=J_lim, y=Kt_lim, name='Inception Boundary', line=dict(color='yellow', dash='dash')))
+        fig_b.add_trace(go.Scatter(x=[J_current], y=[Kt_current], mode='markers', name='Design Point', marker=dict(size=12, color='red')))
+        fig_b.update_layout(template="plotly_dark", height=250, margin=dict(l=20,r=20,b=20,t=20), 
+                            xaxis_title="Advance Ratio (J)", yaxis_title="Thrust Coefficient (Kt)")
+        st.plotly_chart(fig_b, use_container_width=True)
+        
+        # Torque calculation
+        torque = 0.5 * 1025 * (v_knots * 0.5144)**2 * (rudder_chord**2) * rudder_span * 0.05 * naca_thickness
+        st.metric("Estimated Rudder Stock Torque (kNm)", f"{torque/1000:.1f}")
 
         # --- DYNAMIC BLADE-RPM CAVITATION COUPLING ENGINE ---
         st.markdown("### ⚠️ Hydrodynamic Stability & Cavitation Matrix")
