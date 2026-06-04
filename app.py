@@ -1,4 +1,3 @@
-%%writefile C:\Users\rajne\app.py
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -27,11 +26,11 @@ init_db()
 # --- GEOMETRY ENGINES ---
 def get_solid_propeller(diameter, hub_ratio, blades, pitch_law, wake_fraction):
     R = diameter / 2.0; r_hub = R * hub_ratio
-    x, y, z, i_idx, j_idx, k_idx, v = [], [], [], [], [], [], 0
+    x, y, z = [], [], []
     # Hub
     for zh in np.linspace(-0.3, 0.3, 3):
         for th in np.linspace(0, 2*np.pi, 12):
-            x.append(r_hub*np.cos(th)); y.append(r_hub*np.sin(th)); z.append(zh); v += 1
+            x.append(r_hub*np.cos(th)); y.append(r_hub*np.sin(th)); z.append(zh)
     # Blades
     for b in range(blades):
         offset = (2*np.pi/blades)*b
@@ -41,7 +40,7 @@ def get_solid_propeller(diameter, hub_ratio, blades, pitch_law, wake_fraction):
             for c in np.linspace(-0.1*R, 0.1*R, 4):
                 x.append(r_step*np.cos(offset) - c*np.sin(offset))
                 y.append(r_step*np.sin(offset) + c*np.cos(offset))
-                z.append(c*pitch); v += 1
+                z.append(c*pitch)
     return x, y, z
 
 def get_solid_rudder(rudder_type, span, chord, thick_ratio):
