@@ -132,6 +132,26 @@ def generate_universal_propeller(diameter, hub_ratio, blades, pitch_law, wake_fr
 
     return np.array(x_coords), np.array(y_coords), np.array(z_coords)
 
+# --- SECURITY ENTRY PORTAL ---
+def check_password():
+    if "password_correct" not in st.session_state:
+        st.session_state["password_correct"] = False
+    if st.session_state["password_correct"]:
+        return True
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.info("🔒 Secure Portal: HydroOptima AI Enterprise Infrastructure")
+        password = st.text_input("Enter Access Security Key", type="password")
+        if st.button("Unlock Studio Portal"):
+            if password == "HydroSecure2026": 
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("❌ Invalid Access Key. Verification Failed.")
+    return False
+
 if check_password():
     st.title("🌐 HydroOptima Universal Design Studio")
     st.subheader("Multi-Vessel Parametric Propulsion Generation & Asset Compliance Engine")
@@ -197,7 +217,6 @@ if check_password():
 
         st.markdown("---")
         st.subheader("🤖 AI Hydrodynamic Autopilot Optimization")
-        # HERE IS THE AUTOMATION TOGGLE FEATURE
         auto_optimize = st.toggle("Activate AI Geometric Autopilot", value=False, help="When enabled, the app automatically designs the ideal propeller diameter, blade number, and rudder size based on your operational conditions.")
 
         st.markdown("---")
@@ -215,14 +234,11 @@ if check_password():
         st.markdown("---")
         st.subheader("⚙️ Propeller & Rudder Criteria Control")
 
-        # --- AUTOMATION INTERFERENCE BRAIN ---
         if auto_optimize:
             st.info("⚡ **Autopilot Mode Active:** Sidebar parameter inputs have been overridden by automated optimization algorithms to maximize cash recovery.")
 
-            # 1. Automated Intelligent Blade & Speed Evaluation Matrix
             v_advance_calc = v_knots * 0.5144 * (1.0 - w_fraction)
 
-            # Find the largest blade layout that avoids structural cavitation under the power target
             optimized_blades = 4
             for test_z in [6, 5, 4]:
                 mod = 1.0 - (0.075 * (test_z - 4))
@@ -232,20 +248,15 @@ if check_password():
                     optimized_blades = test_z
                     break
 
-            # 2. Automated Optimized Diameter Calculations
-            # If power is immense, scale down diameter to prevent trailing tip speeds crossing boundaries
             if baseline_power > 5000:
                 optimized_diameter = round(max(init_diam - 0.4, 5.8), 2)
             else:
                 optimized_diameter = round(min(init_diam + 0.3, 8.2), 2)
 
-            # 3. Automated Optimized Rudder Aspect Surface Ratios
-            # Auto-scale rudder area up to match 2.5% of the ship's lateral draft footprint safely
             optimized_span = round(max(init_span + 0.8, 8.5), 1)
             optimized_chord = round(max(init_chord + 0.5, 4.8), 1)
             optimized_thickness = 0.16 if baseline_power < 4000 else 0.21
 
-            # Display locked optimized parameters
             diameter = st.number_input("Maximum Propeller Tip Diameter (meters) [AI Locked]", value=float(optimized_diameter), disabled=True)
             blade_count = st.slider("Number of Propeller Blades (Z) [AI Locked]", 3, 6, int(optimized_blades), disabled=True)
             hub_ratio = st.slider("Boss/Hub Diameter Ratio (d/D) [AI Locked]", 0.15, 0.30, 0.22, disabled=True)
@@ -256,7 +267,6 @@ if check_password():
             rudder_chord = st.slider("Rudder Profile Chord Length (meters) [AI Locked]", 2.0, 7.0, float(optimized_chord), disabled=True)
             naca_thickness = st.slider("NACA Profile Thickness Ratio (t/c) [AI Locked]", 0.10, 0.25, float(optimized_thickness), disabled=True)
         else:
-            # Maintain standard slider capability if turned off
             diameter = st.number_input("Maximum Propeller Tip Diameter (meters)", value=float(init_diam))
             blade_count = st.slider("Number of Propeller Blades (Z)", 3, 6, int(init_b))
             hub_ratio = st.slider("Boss/Hub Diameter Ratio (d/D)", 0.15, 0.30, float(init_hr), 0.01)
