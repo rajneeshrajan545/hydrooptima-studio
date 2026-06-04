@@ -6,7 +6,7 @@ import sqlite3
 
 st.set_page_config(page_title="Advanced Propulsion & Hydrodynamic Studio", layout="wide")
 
-# --- 1. DATABASE & ENGINES ---
+# --- DATABASE SETUP ---
 DB_FILE = "projects.db"
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -21,60 +21,87 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
 init_db()
 
+def save_project(p_id, client, v_type, speed, wake, thrust, power, dwt, diam, fuel, days, b_count, h_ratio, p_law, r_type, r_span, r_chord, r_thick, sfoc_val):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO projects VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+                   (p_id, client, v_type, speed, wake, thrust, power, dwt, diam, fuel, days, b_count, h_ratio, p_law, r_type, r_span, r_chord, r_thick, sfoc_val))
+    conn.commit()
+    conn.close()
+
+def get_all_projects():
+    conn = sqlite3.connect(DB_FILE)
+    df = pd.read_sql_query("SELECT * FROM projects", conn)
+    conn.close()
+    return df
+
+def get_imo_parameters(vessel_type, dwt):
+    if vessel_type == "Bulk Carrier": return 4745.0, 0.622
+    elif vessel_type == "Tanker": return 5247.0, 0.610
+    return 4745.0, 0.622
+
+# --- GENERATIVE HYDRODYNAMIC ENGINES ---
 def generate_universal_rudder(rudder_type, span, chord, thick_ratio):
-    z = np.linspace(0, span, 12); x = np.linspace(0, chord, 10)
-    xv, zv = np.meshgrid(x, z)
-    twist = 0.08 * chord * np.sin((zv/span)*np.pi*2) if rudder_type == "Asymmetric Twisted Leading-Edge" else 0
-    return xv + twist, np.zeros_like(xv), zv - (span/2)
+    z_nodes = np.linspace(0, span, 12); x_nodes = np.linspace(0, chord, 10)
+    x, y, z = [], [], []
+    for zv in z_nodes:
+        twist = 0.08 * chord * np.sin((zv/span)*np.pi*2) if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.0
+        for xv in x_nodes:
+            pos_x = xv / chord
+            y_thick = (thick_ratio / 0.2) * chord * (0.2969 * np.sqrt(pos_x) - 0.1260*pos_x - 0.3516*(pos_x**2) + 0.2843*(pos_x**3) - 0.1015*(pos_x**4))
+            x.extend([xv+twist, xv+twist]); y.extend([y_thick, -y_thick]); z.extend([zv, zv])
+    return np.array(x), np.array(y), np.array(z)
 
 def generate_universal_propeller(diameter, blades, wake):
-    R = diameter/2.0
-    theta = np.linspace(0, 2*np.pi, 50)
+    R = diameter / 2.0
     x, y, z = [], [], []
     for b in range(blades):
-        offset = (2*np.pi/blades)*b
+        offset = (2 * np.pi / blades) * b
         for r in np.linspace(0.2*R, R, 8):
-            x.append(r*np.cos(theta+offset)); y.append(r*np.sin(theta+offset)); z.append(np.full_like(theta, r*(0.1+wake)))
-    return np.concatenate(x), np.concatenate(y), np.concatenate(z)
+            theta = np.linspace(0, np.pi / 2, 8) + offset
+            px = r * np.cos(theta); py = r * np.sin(theta) * (1.1 - 0.2*(r/R)) * (1.0 - wake); pz = np.full_like(px, r)
+            x.extend(px); y.extend(py); z.extend(pz)
+    return np.array(x), np.array(y), np.array(z)
 
-# --- 2. INTERFACE ---
+# --- APP INTERFACE ---
 st.title("🌐 HydroOptima Universal Design Studio")
-col1, col2 = st.columns([1, 2])
+if "s_val" not in st.session_state:
+    st.session_state.update({"s_val": 14.0, "p_val": 4258.0, "diam_val": 7.30, "b_count": 4, "r_span": 7.5, "r_chord": 4.2})
 
+col1, col2 = st.columns([1, 2])
 with col1:
     st.header("📋 Universal Project Core")
-    v_type = st.selectbox("Vessel Hull Form", ["Bulk Carrier", "Tanker", "General Cargo"])
-    speed = st.slider("Service Speed (kn)", 10.0, 22.0, 14.0)
-    power = st.number_input("Baseline Power (kW)", value=4258.0)
-    diam = st.number_input("Diameter (m)", value=7.30)
-    blades = st.slider("Blades (Z)", 3, 6, 4)
-    span = st.slider("Rudder Span (m)", 4.0, 12.0, 7.5, 0.1)
-    chord = st.slider("Rudder Chord (m)", 2.0, 7.0, 4.2, 0.1)
-    st.markdown("---")
-    st.info("**1. Solidity:** Parabolic Skew\n**2. Foil:** Twisted Leading-Edge\n**3. Wake:** Rudder Bulb")
+    speed = st.slider("Service Speed (kn)", 10.0, 20.0, st.session_state.s_val, 0.5)
+    power = st.number_input("Baseline Power (kW)", value=st.session_state.p_val)
+    diam = st.number_input("Diameter (m)", value=st.session_state.diam_val)
+    blades = st.slider("Blades (Z)", 3, 6, st.session_state.b_count)
+    span = st.slider("Rudder Span (m)", 4.0, 12.0, st.session_state.r_span, 0.1)
+    chord = st.slider("Rudder Chord (m)", 2.0, 7.0, st.session_state.r_chord, 0.1)
 
 with col2:
     st.header("📊 Executive Optimization Summary")
     savings = (power * 0.08 * 800)
     m1, m2, m3 = st.columns(3)
-    m1.metric("Fuel Drop", "1.09 Tons/Day")
+    m1.metric("Daily Fuel Drop", "1.09 Tons/Day")
     m2.metric("Annual Savings", f"${savings:,.2f} USD")
     m3.metric("CII Reduction", "802.0 Tons/Yr")
     
     st.header("🔮 Real-Time Universal Shaded Preview")
     fig = go.Figure()
     px, py, pz = generate_universal_propeller(diam, blades, 0.2)
-    fig.add_trace(go.Scatter3d(x=px, y=py, z=pz, mode='markers', marker=dict(color='gold', size=2)))
+    fig.add_trace(go.Scatter3d(x=px, y=py, z=pz, mode='markers', name='Prop', marker=dict(color='gold', size=6)))
     rx, ry, rz = generate_universal_rudder("Asymmetric Twisted Leading-Edge", span, chord, 0.18)
-    fig.add_trace(go.Scatter3d(x=rx.flatten(), y=ry.flatten(), z=rz.flatten(), mode='markers', marker=dict(color='teal', size=2)))
+    fig.add_trace(go.Scatter3d(x=[v + diam*0.6 for v in rx], y=ry, z=rz, mode='markers', name='Rudder', marker=dict(color='teal', size=6)))
     fig.update_layout(template="plotly_dark", height=400, margin=dict(l=0,r=0,b=0,t=0), scene=dict(aspectmode='data'))
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("📉 Dynamic IMO CII Regulatory Timeline")
     fig_cii = go.Figure()
-    fig_cii.add_trace(go.Scatter(x=[2026, 2030], y=[5.0, 4.2], name='Unmodified Status Quo', line=dict(color='crimson')))
-    fig_cii.add_trace(go.Scatter(x=[2026, 2030], y=[4.2, 3.4], name='With Optimized Integration', line=dict(color='limegreen')))
+    years = [2026, 2027, 2028, 2029, 2030]
+    fig_cii.add_trace(go.Scatter(x=years, y=[5.0, 4.8, 4.6, 4.4, 4.2], name='Unmodified Status Quo', line=dict(color='crimson')))
+    fig_cii.add_trace(go.Scatter(x=years, y=[4.2, 4.0, 3.8, 3.6, 3.4], name='With Optimized Integration', line=dict(color='limegreen')))
     fig_cii.update_layout(template="plotly_dark", height=250, margin=dict(l=0,r=0,b=0,t=0))
     st.plotly_chart(fig_cii, use_container_width=True)
