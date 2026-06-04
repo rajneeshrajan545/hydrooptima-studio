@@ -161,29 +161,27 @@ if check_password():
     st.markdown("### 🗃️ Enterprise Knowledge Base")
     saved_df = get_all_projects()
 
-    # Standardized key strings initialization to completely fix AttributeError matches
-    if "s_val" not in st.session_state:
-        st.session_state.s_val, st.session_state.w_val, st.session_state.t_val, st.session_state.p_val = 13.0, 0.296, 0.201, 3401.0
-        st.session_state.dwt_val, st.session_state.diam_val, st.session_state.fuel_val, st.session_state.days_val = 82000.0, 6.8, 650.0, 220.0
-        st.session_state.b_count, st.session_state.hub_ratio, st.session_state.p_law = 4, 0.22, "Parabolic (Reduced Tip & Hub Loading)"
-        st.session_state.r_type, st.session_state.r_span, st.session_state.r_chord, st.session_state.r_thick = "Asymmetric Twisted Leading-Edge", 7.5, 4.2, 0.18
-        st.session_state.client_val, st.session_state.id_val, st.session_state.vtype_val = "Global Maritime Fleet", "Project Eco-Bulk 01", "Bulk Carrier"
-        st.session_state.sfoc_default = 185.0
+    # Initialize dictionary parameters directly into standard fallback references
+    init_s, init_w, init_t, init_p = 13.0, 0.296, 0.201, 3401.0
+    init_dwt, init_diam, init_fuel, init_days = 82000.0, 6.8, 650.0, 220.0
+    init_b, init_hr, init_pl = 4, 0.22, "Parabolic (Reduced Tip & Hub Loading)"
+    init_rt, init_span, init_chord, init_thick = "Asymmetric Twisted Leading-Edge", 7.5, 4.2, 0.18
+    init_client, init_id, init_vtype = "Global Maritime Fleet", "Project Eco-Bulk 01", "Bulk Carrier"
+    init_sfoc = 185.0
 
     if not saved_df.empty:
         project_list = ["New Project Configuration"] + saved_df['project_id'].tolist()
         chosen_profile = st.selectbox("Load Saved Asset Configuration Profile:", project_list)
 
-        if chosen_profile != "New Project Configuration" and st.button("🔄 Initialize Selection Targets"):
+        if chosen_profile != "New Project Configuration":
             p_data = saved_df[saved_df['project_id'] == chosen_profile].iloc[0]
-            st.session_state.s_val, st.session_state.w_val, st.session_state.t_val = float(p_data['speed']), float(p_data['wake_fraction']), float(p_data['thrust_deduction'])
-            st.session_state.p_val, st.session_state.dwt_val, st.session_state.diam_val = float(p_data['power']), float(p_data['dwt']), float(p_data['diameter'])
-            st.session_state.fuel_val, st.session_state.days_val, st.session_state.b_count = float(p_data['fuel_cost']), float(p_data['op_days']), int(p_data['blade_count'])
-            st.session_state.hub_ratio, st.session_state.p_law, st.session_state.r_type = float(p_data['hub_ratio']), str(p_data['pitch_law']), str(p_data['rudder_type'])
-            st.session_state.r_span, st.session_state.r_chord, st.session_state.r_thick = float(p_data['rudder_span']), float(p_data['rudder_chord']), float(p_data['naca_thickness'])
-            st.session_state.client_val, st.session_state.id_val, st.session_state.vtype_val = str(p_data['client_name']), str(p_data['project_id']), str(p_data['vessel_type'])
-            st.session_state.sfoc_default = float(p_data['sfoc']) if 'sfoc' in p_data else 185.0
-            st.rerun()
+            init_s, init_w, init_t = float(p_data['speed']), float(p_data['wake_fraction']), float(p_data['thrust_deduction'])
+            init_p, init_dwt, init_diam = float(p_data['power']), float(p_data['dwt']), float(p_data['diameter'])
+            init_fuel, init_days, init_b = float(p_data['fuel_cost']), float(p_data['op_days']), int(p_data['blade_count'])
+            init_hr, init_pl, init_rt = float(p_data['hub_ratio']), str(p_data['pitch_law']), str(p_data['rudder_type'])
+            init_span, init_chord, init_thick = float(p_data['rudder_span']), float(p_data['rudder_chord']), float(p_data['naca_thickness'])
+            init_client, init_id, init_vtype = str(p_data['client_name']), str(p_data['project_id']), str(p_data['vessel_type'])
+            init_sfoc = float(p_data['sfoc']) if 'sfoc' in p_data else 185.0
 
     st.markdown("---")
     col1, col2 = st.columns([1, 2])
@@ -192,76 +190,73 @@ if check_password():
         st.header("📋 Universal Project Core")
         input_mode = st.radio("Select Data Input Method", ["Interactive Sliders", "Automated CSV Upload"])
 
-        client_name = st.text_input("Client / Shipowner Identifier", value=st.session_state.client_val)
-        vessel_id = st.text_input("Vessel Identifier / Project Code", value=st.session_state.id_val)
+        client_name = st.text_input("Client / Shipowner Identifier", value=init_client)
+        vessel_id = st.text_input("Vessel Identifier / Project Code", value=init_id)
 
         v_list = ["Bulk Carrier", "Tanker", "General Cargo Ship", "LNG Carrier"]
-        v_index = v_list.index(st.session_state.vtype_val) if st.session_state.vtype_val in v_list else 0
+        v_index = v_list.index(init_vtype) if init_vtype in v_list else 0
         vessel_type = st.selectbox("Vessel Hull Form Classification (CII Reference Mode)", v_list, index=v_index)
 
         if input_mode == "Automated CSV Upload":
             st.markdown("---")
             st.subheader("📂 Drag & Drop Towing Tank Spreadsheet")
             uploaded_file = st.file_uploader("Upload Model Test CSV Profile", type=["csv"])
-
             if uploaded_file is not None:
                 try:
                     csv_df = pd.read_csv(uploaded_file)
-                    if 'Speed' in csv_df.columns: st.session_state.s_val = float(csv_df['Speed'].iloc[0])
-                    if 'Wake' in csv_df.columns: st.session_state.w_val = float(csv_df['Wake'].iloc[0])
-                    if 'Thrust_Deduction' in csv_df.columns: st.session_state.t_val = float(csv_df['Thrust_Deduction'].iloc[0])
-                    if 'Power' in csv_df.columns: st.session_state.p_val = float(csv_df['Power'].iloc[0])
-                    if 'DWT' in csv_df.columns: st.session_state.dwt_val = float(csv_df['DWT'].iloc[0])
-                    if 'Diameter' in csv_df.columns: st.session_state.diam_val = float(csv_df['Diameter'].iloc[0])
-                    if 'Blades' in csv_df.columns: st.session_state.b_count = int(csv_df['Blades'].iloc[0])
-                    if 'SFOC' in csv_df.columns: st.session_state.sfoc_default = float(csv_df['SFOC'].iloc[0])
-                    st.success("🎯 Towing tank file configurations loaded successfully!")
+                    if 'Speed' in csv_df.columns: init_s = float(csv_df['Speed'].iloc[0])
+                    if 'Wake' in csv_df.columns: init_w = float(csv_df['Wake'].iloc[0])
+                    if 'Thrust_Deduction' in csv_df.columns: init_t = float(csv_df['Thrust_Deduction'].iloc[0])
+                    if 'Power' in csv_df.columns: init_p = float(csv_df['Power'].iloc[0])
+                    if 'DWT' in csv_df.columns: init_dwt = float(csv_df['DWT'].iloc[0])
+                    if 'Diameter' in csv_df.columns: init_diam = float(csv_df['Diameter'].iloc[0])
+                    if 'Blades' in csv_df.columns: init_b = int(csv_df['Blades'].iloc[0])
+                    if 'SFOC' in csv_df.columns: init_sfoc = float(csv_df['SFOC'].iloc[0])
+                    st.success("🎯 Towing tank configurations mapped successfully into core memory!")
                 except Exception as e:
-                    st.error(f"Failed to extract structured CSV data: {e}")
-            else:
-                st.warning("ℹ️ Formatting Guide: Ensure your CSV file includes row headers named exactly: 'Speed', 'Wake', 'Thrust_Deduction', 'Power', 'DWT', 'Diameter', 'Blades', 'SFOC'.")
+                    st.error(f"Failed to read CSV payload columns: {e}")
 
         st.markdown("---")
         st.subheader("⚙️ Propeller Generative Criteria")
-        diameter = st.number_input("Maximum Propeller Tip Diameter (meters)", value=float(st.session_state.diam_val))
-        blade_count = st.slider("Number of Propeller Blades (Z)", 3, 6, int(st.session_state.b_count))
-        hub_ratio = st.slider("Boss/Hub Diameter Ratio (d/D)", 0.15, 0.30, float(st.session_state.hub_ratio), 0.01)
-        pitch_law = st.selectbox("Radial Pitch Distribution Matrix", ["Linear Distribution", "Parabolic (Reduced Tip & Hub Loading)"], index=0 if st.session_state.p_law == "Linear Distribution" else 1)
+        diameter = st.number_input("Maximum Propeller Tip Diameter (meters)", value=float(init_diam))
+        blade_count = st.slider("Number of Propeller Blades (Z)", 3, 6, int(init_b))
+        hub_ratio = st.slider("Boss/Hub Diameter Ratio (d/D)", 0.15, 0.30, float(init_hr), 0.01)
+        pitch_law = st.selectbox("Radial Pitch Distribution Matrix", ["Linear Distribution", "Parabolic (Reduced Tip & Hub Loading)"], index=0 if init_pl == "Linear Distribution" else 1)
 
         st.markdown("---")
         st.subheader("🧬 Rudder Generative Criteria")
-        rudder_type = st.selectbox("Hydrodynamic Rudder Profile Style", ["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"], index=["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"].index(st.session_state.r_type))
-        rudder_span = st.slider("Rudder Structural Span Height (meters)", 4.0, 12.0, float(st.session_state.r_span), 0.1)
-        rudder_chord = st.slider("Rudder Profile Chord Length (meters)", 2.0, 7.0, float(st.session_state.r_chord), 0.1)
-        naca_thickness = st.slider("NACA Profile Thickness Ratio (t/c)", 0.10, 0.25, float(st.session_state.r_thick), 0.01)
+        rudder_type = st.selectbox("Hydrodynamic Rudder Profile Style", ["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"], index=["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"].index(init_rt))
+        rudder_span = st.slider("Rudder Structural Span Height (meters)", 4.0, 12.0, float(init_span), 0.1)
+        rudder_chord = st.slider("Rudder Profile Chord Length (meters)", 2.0, 7.0, float(init_chord), 0.1)
+        naca_thickness = st.slider("NACA Profile Thickness Ratio (t/c)", 0.10, 0.25, float(init_thick), 0.01)
 
         st.markdown("---")
         st.subheader("🌊 Operational Conditions")
-        vessel_dwt = st.number_input("Vessel Deadweight (DWT Tons)", value=float(st.session_state.dwt_val))
-        v_knots = st.slider("Design Service Speed (Knots)", 10.0, 22.0, float(st.session_state.s_val), 0.5)
-        w_fraction = st.slider("Taylor Wake Fraction (w)", 0.100, 0.400, float(st.session_state.w_val), 0.001)
-        t_deduction = st.slider("Thrust Deduction Factor (t)", 0.100, 0.300, float(st.session_state.t_val), 0.001)
+        vessel_dwt = st.number_input("Vessel Deadweight (DWT Tons)", value=float(init_dwt))
+        v_knots = st.slider("Design Service Speed (Knots)", 10.0, 22.0, float(init_s), 0.5)
+        w_fraction = st.slider("Taylor Wake Fraction (w)", 0.100, 0.400, float(init_w), 0.001)
+        t_deduction = st.slider("Thrust Deduction Factor (t)", 0.100, 0.300, float(init_t), 0.001)
 
-        baseline_power = st.number_input("Baseline Installed Shaft Power (kW)", value=float(st.session_state.p_val))
-        sfoc_input = st.number_input("Specific Fuel Oil Consumption - SFOC (g/kW-h)", value=float(st.session_state.sfoc_default), step=1.0)
-
-        fuel_cost = st.number_input("Fuel Cost (USD / Metric Ton)", value=float(st.session_state.fuel_val))
-        op_days = st.number_input("Annual Days Operational at Sea", value=float(st.session_state.days_val))
+        baseline_power = st.number_input("Baseline Installed Shaft Power (kW)", value=float(init_p))
+        sfoc_input = st.number_input("Specific Fuel Oil Consumption - SFOC (g/kW-h)", value=float(init_sfoc), step=1.0)
+        fuel_cost = st.number_input("Fuel Cost (USD / Metric Ton)", value=float(init_fuel))
+        op_days = st.number_input("Annual Days Operational at Sea", value=float(init_days))
 
         st.markdown("---")
         if st.button("💾 Commit Universal Parameters to Database"):
             save_project(vessel_id, client_name, vessel_type, v_knots, w_fraction, t_deduction, baseline_power, vessel_dwt, diameter, fuel_cost, op_days, blade_count, hub_ratio, pitch_law, rudder_type, rudder_span, rudder_chord, naca_thickness, sfoc_input)
             st.success(f"✅ Universal profile recorded safely with engine SFOC metrics! Saved as '{vessel_id}'")
-            st.session_state.clear()
             st.rerun()
 
-    # --- Hydrodynamic Energy Recovery Backend Processing ---
+    # --- 🔒 PIPELINE ENGINE CALCULATIONS LAYER (No session state decoupling locks) ---
     base_prop_eff = 0.68 + (0.02 * (4 - blade_count))
     rudder_area = rudder_span * rudder_chord
 
+    # Process lift/drag vector equations using live active slider metrics
     swirl_recovery_gain = 0.0035 * rudder_area * (1.25 if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.85)
     rudder_drag_penalty = 0.0048 * rudder_area * (naca_thickness / 0.18)
     rudder_efficiency_gain = max(swirl_recovery_gain - rudder_drag_penalty, 0.012)
+
     opt_prop_eff = base_prop_eff + rudder_efficiency_gain
 
     sfc_tons = sfoc_input / 1000.0 / 1000.0  
@@ -323,21 +318,28 @@ if check_password():
         c1, c2 = st.columns(2)
         with c1:
             if tip_speed < 36.0:
-                st.success(f"🟢 **Tip Velocity Boundary: SAFE ({tip_speed:.1f} m/s)**\n\nLocal shear velocities sit securely below cavitation limits.")
+                st.success(f"🟢 **Tip Velocity Boundary: SAFE ({tip_speed:.1f} m/s)**\n\nLocal shear velocities sit securely below cavitation limits. Low risk of structural pressure pulses.")
             elif tip_speed <= 43.0:
-                st.warning(f"🟡 **Tip Velocity Boundary: MARGINAL EROSION RISK ({tip_speed:.1f} m/s)**\n\nTip velocities crossing into transition zone.")
+                if blade_count < 5:
+                    advice_text = "Consider shifting to a 5 or 6-blade profile to drop required shaft RPM and lower localized tip speed."
+                elif blade_count == 5:
+                    advice_text = "Already optimized to 5 blades. Consider shifting to 6 blades, reducing diameter by 0.2m, or decreasing maximum service speed to clear transition thresholds."
+                else:
+                    advice_text = "Utilizing high-solidity 6-blade configuration. To lower tip speed further, slightly shave propeller diameter or apply trailing-edge boundary thickness modifications."
+                st.warning(f"🟡 **Tip Velocity Boundary: MARGINAL EROSION RISK ({tip_speed:.1f} m/s)**\n\nTip velocities crossing into transition zone. Minor sheet cavitation likely. {advice_text}")
             else:
-                st.error(f"🔴 **Tip Velocity Boundary: CAVITATION CRITICAL ({tip_speed:.1f} m/s)**\n\nSevere localized boiling threshold exceeded!")
+                st.error(f"🔴 **Tip Velocity Boundary: CAVITATION CRITICAL ({tip_speed:.1f} m/s)**\n\nSevere localized boiling threshold exceeded! Material erosion, cavitation pitting, and intense hull vibration risk. Increase blade count, decrease diameter, or drop speed targets.")
 
         with c2:
             loading_index = (baseline_power) / (blade_count * (diameter**2))
             if loading_index < 125.0:
                 st.success("🟢 **Surface Blade Loading Profile: OPTIMAL**")
             else:
-                st.warning("🟡 **Surface Blade Loading Profile: HIGH PRESSURE VARIANCE**")
+                st.warning("🟡 **Surface Blade Loading Profile: HIGH PRESSURE VARIANCE**\n\nHigh power concentration per square meter of blade face area. Check localized thickness skew to verify trailing-edge boundary unloading.")
 
         st.markdown("---")
         st.subheader("📉 Dynamic IMO CII Regulatory Life-Extension Timeline")
+        st.write(f"Evaluating specific compliance threshold lines mapped for **{vessel_type}** profiles using standard IMO coefficients.")
 
         years = np.array([2026, 2027, 2028, 2029, 2030])
         reduction_factors = np.array([0.05, 0.07, 0.09, 0.11, 0.13])
