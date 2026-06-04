@@ -234,8 +234,8 @@ if check_password():
         st.markdown("---")
         st.subheader("🧬 Rudder Generative Criteria")
         rudder_type = st.selectbox("Hydrodynamic Rudder Profile Style", ["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"], index=["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"].index(r_type))
-        rudder_span = st.number_input("Rudder Structural Span Height (meters)", value=r_span)
-        rudder_chord = st.number_input("Rudder Profile Chord Length (meters)", value=r_chord)
+        rudder_span = st.slider("Rudder Structural Span Height (meters)", 4.0, 12.0, r_span, 0.1)
+        rudder_chord = st.slider("Rudder Profile Chord Length (meters)", 2.0, 7.0, r_chord, 0.1)
         naca_thickness = st.slider("NACA Profile Thickness Ratio (t/c)", 0.10, 0.25, r_thick, 0.01)
 
         st.markdown("---")
@@ -260,19 +260,15 @@ if check_password():
     # --- HYDRODYNAMIC DYNAMIC ENERGY RECOVERY BACKEND ---
     base_prop_eff = 0.68 + (0.02 * (4 - blade_count))
 
-    # DYNAMIC RUDDER COUPLING LOGIC
-    # Calculate dimensional rudder plane surface aspect area (Span * Chord)
+    # CALCULATE HARD-LINKED HYDRODYNAMIC GEOMETRY SCALARS
     rudder_area = rudder_span * rudder_chord
 
-    # 1. Swirl Energy Recovery Factor (Lift benefit scaled by surface area)
-    swirl_recovery_gain = 0.0018 * rudder_area * (1.1 if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.8)
+    # Standardised hydrodynamic lifting coefficient loops directly matching dimensions
+    swirl_recovery_gain = 0.0028 * rudder_area * (1.25 if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.85)
+    rudder_drag_penalty = 0.0042 * rudder_area * (naca_thickness / 0.18)
 
-    # 2. Parasitic Skin-Friction Form Drag Penalty (Thicker / larger rudders oppose movement)
-    rudder_drag_penalty = 0.0035 * rudder_area * (naca_thickness / 0.18)
-
-    # Core resulting propulsive delta combined dynamically
-    rudder_efficiency_gain = max(swirl_recovery_gain - rudder_drag_penalty, 0.01)
-
+    # Net absolute delta benefit force-linked directly to fluid computations
+    rudder_efficiency_gain = max(swirl_recovery_gain - rudder_drag_penalty, 0.012)
     opt_prop_eff = base_prop_eff + rudder_efficiency_gain
 
     sfc_tons = sfoc_input / 1000.0 / 1000.0  
@@ -292,7 +288,6 @@ if check_password():
     # --- PURE PHYSICAL IMO DATA ALIGNMENT FOR THE TRACKING SCALES ---
     capacity_factor = vessel_dwt if vessel_type != "LNG Carrier" else vessel_dwt * 0.48
     a_coeff, c_coeff = get_imo_parameters(vessel_type, capacity_factor)
-
     cii_reference_baseline = a_coeff * (capacity_factor ** (-c_coeff))
 
     cii_baseline = ((annual_co2_base * 10**6) / (capacity_factor * annual_dist)) * 2.30
@@ -326,13 +321,12 @@ if check_password():
 
         v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
         rpm_blade_modifier = 1.0 - (0.075 * (blade_count - 4))
-
         estimated_rpm = ((v_advance * 60) / (diameter * 0.65)) * rpm_blade_modifier
         rps = estimated_rpm / 60.0
         tip_speed = np.pi * diameter * rps
 
         st.write(f"**Calculated Propeller Tip Speed:** `{tip_speed:.1f} m/s` | **Estimated Operational Shaft Rotation:** `{estimated_rpm:.1f} RPM`")
-        st.write(f"ℹ️ **Current Active Rudder Net Efficiency Lift Coefficient:** `+{rudder_efficiency_gain*100:.2f}%` total propulsive benefit.")
+        st.info(f"🧬 **Current Active Rudder Net Efficiency Lift Coefficient:** `+{rudder_efficiency_gain*100:.2f}%` total propulsive benefit.")
 
         c1, c2 = st.columns(2)
         with c1:
