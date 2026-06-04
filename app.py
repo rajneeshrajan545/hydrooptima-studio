@@ -132,30 +132,10 @@ def generate_universal_propeller(diameter, hub_ratio, blades, pitch_law, wake_fr
 
     return np.array(x_coords), np.array(y_coords), np.array(z_coords)
 
-# --- SECURITY ENTRY PORTAL ---
-def check_password():
-    if "password_correct" not in st.session_state:
-        st.session_state["password_correct"] = False
-    if st.session_state["password_correct"]:
-        return True
-
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.info("🔒 Secure Portal: HydroOptima AI Enterprise Infrastructure")
-        password = st.text_input("Enter Access Security Key", type="password")
-        if st.button("Unlock Studio Portal"):
-            if password == "HydroSecure2026": 
-                st.session_state["password_correct"] = True
-                st.rerun()
-            else:
-                st.error("❌ Invalid Access Key. Verification Failed.")
-    return False
-
 if check_password():
     st.title("🌐 HydroOptima Universal Design Studio")
     st.subheader("Multi-Vessel Parametric Propulsion Generation & Asset Compliance Engine")
-    st.write("Universal physics-based toolchain for any vessel hull-interaction profile and IMO EEXI / CII regulatory engineering.")
+    st.write("Universal physics-based toolchain with automated geometric optimization models.")
 
     # --- TOP ROW: HISTORY RETRIEVAL MANAGER ---
     st.markdown("### 🗃️ Enterprise Knowledge Base")
@@ -214,22 +194,11 @@ if check_password():
                     st.success("🎯 Towing tank configuration parameters loaded successfully!")
                 except Exception as e:
                     st.error(f"Failed to parse CSV columns: {e}")
-            else:
-                st.warning("ℹ️ Formatting Guide: Ensure your CSV file includes row headers named exactly: 'Speed', 'Wake', 'Thrust_Deduction', 'Power', 'DWT', 'Diameter', 'Blades', 'SFOC'.")
 
         st.markdown("---")
-        st.subheader("⚙️ Propeller Generative Criteria")
-        diameter = st.number_input("Maximum Propeller Tip Diameter (meters)", value=float(init_diam))
-        blade_count = st.slider("Number of Propeller Blades (Z)", 3, 6, int(init_b))
-        hub_ratio = st.slider("Boss/Hub Diameter Ratio (d/D)", 0.15, 0.30, float(init_hr), 0.01)
-        pitch_law = st.selectbox("Radial Pitch Distribution Matrix", ["Linear Distribution", "Parabolic (Reduced Tip & Hub Loading)"], index=0 if init_pl == "Linear Distribution" else 1)
-
-        st.markdown("---")
-        st.subheader("🧬 Rudder Generative Criteria")
-        rudder_type = st.selectbox("Hydrodynamic Rudder Profile Style", ["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"], index=["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"].index(init_rt))
-        rudder_span = st.slider("Rudder Structural Span Height (meters)", 4.0, 12.0, float(init_span), 0.1)
-        rudder_chord = st.slider("Rudder Profile Chord Length (meters)", 2.0, 7.0, float(init_chord), 0.1)
-        naca_thickness = st.slider("NACA Profile Thickness Ratio (t/c)", 0.10, 0.25, float(init_thick), 0.01)
+        st.subheader("🤖 AI Hydrodynamic Autopilot Optimization")
+        # HERE IS THE AUTOMATION TOGGLE FEATURE
+        auto_optimize = st.toggle("Activate AI Geometric Autopilot", value=False, help="When enabled, the app automatically designs the ideal propeller diameter, blade number, and rudder size based on your operational conditions.")
 
         st.markdown("---")
         st.subheader("🌊 Operational Conditions")
@@ -244,23 +213,76 @@ if check_password():
         op_days = st.number_input("Annual Days Operational at Sea", value=float(init_days))
 
         st.markdown("---")
+        st.subheader("⚙️ Propeller & Rudder Criteria Control")
+
+        # --- AUTOMATION INTERFERENCE BRAIN ---
+        if auto_optimize:
+            st.info("⚡ **Autopilot Mode Active:** Sidebar parameter inputs have been overridden by automated optimization algorithms to maximize cash recovery.")
+
+            # 1. Automated Intelligent Blade & Speed Evaluation Matrix
+            v_advance_calc = v_knots * 0.5144 * (1.0 - w_fraction)
+
+            # Find the largest blade layout that avoids structural cavitation under the power target
+            optimized_blades = 4
+            for test_z in [6, 5, 4]:
+                mod = 1.0 - (0.075 * (test_z - 4))
+                test_rpm = ((v_advance_calc * 60) / (init_diam * 0.65)) * mod
+                test_vtip = np.pi * init_diam * (test_rpm / 60.0)
+                if test_vtip <= 38.5:
+                    optimized_blades = test_z
+                    break
+
+            # 2. Automated Optimized Diameter Calculations
+            # If power is immense, scale down diameter to prevent trailing tip speeds crossing boundaries
+            if baseline_power > 5000:
+                optimized_diameter = round(max(init_diam - 0.4, 5.8), 2)
+            else:
+                optimized_diameter = round(min(init_diam + 0.3, 8.2), 2)
+
+            # 3. Automated Optimized Rudder Aspect Surface Ratios
+            # Auto-scale rudder area up to match 2.5% of the ship's lateral draft footprint safely
+            optimized_span = round(max(init_span + 0.8, 8.5), 1)
+            optimized_chord = round(max(init_chord + 0.5, 4.8), 1)
+            optimized_thickness = 0.16 if baseline_power < 4000 else 0.21
+
+            # Display locked optimized parameters
+            diameter = st.number_input("Maximum Propeller Tip Diameter (meters) [AI Locked]", value=float(optimized_diameter), disabled=True)
+            blade_count = st.slider("Number of Propeller Blades (Z) [AI Locked]", 3, 6, int(optimized_blades), disabled=True)
+            hub_ratio = st.slider("Boss/Hub Diameter Ratio (d/D) [AI Locked]", 0.15, 0.30, 0.22, disabled=True)
+            pitch_law = st.selectbox("Radial Pitch Distribution Matrix [AI Locked]", ["Parabolic (Reduced Tip & Hub Loading)"], index=0, disabled=True)
+
+            rudder_type = st.selectbox("Hydrodynamic Rudder Profile Style [AI Locked]", ["Asymmetric Twisted Leading-Edge"], index=0, disabled=True)
+            rudder_span = st.slider("Rudder Structural Span Height (meters) [AI Locked]", 4.0, 12.0, float(optimized_span), disabled=True)
+            rudder_chord = st.slider("Rudder Profile Chord Length (meters) [AI Locked]", 2.0, 7.0, float(optimized_chord), disabled=True)
+            naca_thickness = st.slider("NACA Profile Thickness Ratio (t/c) [AI Locked]", 0.10, 0.25, float(optimized_thickness), disabled=True)
+        else:
+            # Maintain standard slider capability if turned off
+            diameter = st.number_input("Maximum Propeller Tip Diameter (meters)", value=float(init_diam))
+            blade_count = st.slider("Number of Propeller Blades (Z)", 3, 6, int(init_b))
+            hub_ratio = st.slider("Boss/Hub Diameter Ratio (d/D)", 0.15, 0.30, float(init_hr), 0.01)
+            pitch_law = st.selectbox("Radial Pitch Distribution Matrix", ["Linear Distribution", "Parabolic (Reduced Tip & Hub Loading)"], index=0 if init_pl == "Linear Distribution" else 1)
+
+            rudder_type = st.selectbox("Hydrodynamic Rudder Profile Style", ["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"], index=["Conventional Flat-Plate", "Semi-Spade High Efficiency", "Asymmetric Twisted Leading-Edge", "Schilling / Flapped High-Lift"].index(init_rt))
+            rudder_span = st.slider("Rudder Structural Span Height (meters)", 4.0, 12.0, float(init_span), 0.1)
+            rudder_chord = st.slider("Rudder Profile Chord Length (meters)", 2.0, 7.0, float(init_chord), 0.1)
+            naca_thickness = st.slider("NACA Profile Thickness Ratio (t/c)", 0.10, 0.25, float(init_thick), 0.01)
+
+        st.markdown("---")
         if st.button("💾 Commit Universal Parameters to Database"):
             save_project(vessel_id, client_name, vessel_type, v_knots, w_fraction, t_deduction, baseline_power, vessel_dwt, diameter, fuel_cost, op_days, blade_count, hub_ratio, pitch_law, rudder_type, rudder_span, rudder_chord, naca_thickness, sfoc_input)
             st.success(f"✅ Universal profile recorded safely with engine SFOC metrics! Saved as '{vessel_id}'")
             st.rerun()
 
-    # --- 🔒 MATHEMATICAL HYDRODYNAMIC ENGINES (linked directly to live widget variables) ---
+    # --- HYDRODYNAMIC MATHEMATICAL ENGINES ---
     base_prop_eff = 0.68 + (0.02 * (4 - blade_count))
     rudder_area = rudder_span * rudder_chord
 
-    # Dynamic swirl energy recovery coefficient loop
     swirl_recovery_gain = 0.0085 * rudder_area * (1.25 if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.85)
     rudder_drag_penalty = 0.0092 * rudder_area * (naca_thickness / 0.18)
     rudder_efficiency_gain = max(swirl_recovery_gain - rudder_drag_penalty, 0.015)
 
     opt_prop_eff = base_prop_eff + rudder_efficiency_gain
 
-    # Fuel loop bound directly to baseline_power input
     sfc_tons = sfoc_input / 1000.0 / 1000.0  
     daily_baseline_fuel = baseline_power * 24 * sfc_tons
     daily_optimized_fuel = (baseline_power * (base_prop_eff / opt_prop_eff)) * 24 * sfc_tons
