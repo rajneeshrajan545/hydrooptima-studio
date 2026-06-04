@@ -367,12 +367,16 @@ if check_password():
                             scene=dict(xaxis_title="X (Chord/Trans)", yaxis_title="Y (Thickness)", zaxis_title="Z (Span Height)"))
         st.plotly_chart(fig3d, use_container_width=True)
 
-        # --- NEW: CAVITATION & TORQUE MATRIX ---
+       # --- CAVITATION & TORQUE MATRIX ---
         st.markdown("---")
         st.subheader("⚠️ Cavitation & Torque Matrix")
         
-        # Calculate Current Operational Point
+        # 1. Ensure these variables exist (calculated using your existing logic)
         v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
+        rpm_blade_modifier = 1.0 - (0.075 * (blade_count - 4))
+        estimated_rpm = ((v_advance * 60) / (diameter * 0.65)) * rpm_blade_modifier
+        
+        # 2. Now calculate the Cavitation/Torque metrics
         J_current = v_advance / ((estimated_rpm/60.0) * diameter)
         Kt_current = baseline_power / (1025 * (estimated_rpm/60.0)**3 * (diameter**5))
         
@@ -385,10 +389,9 @@ if check_password():
                             xaxis_title="Advance Ratio (J)", yaxis_title="Thrust Coefficient (Kt)")
         st.plotly_chart(fig_b, use_container_width=True)
         
-        # Torque calculation
+        # 3. Torque calculation
         torque = 0.5 * 1025 * (v_knots * 0.5144)**2 * (rudder_chord**2) * rudder_span * 0.05 * naca_thickness
         st.metric("Estimated Rudder Stock Torque (kNm)", f"{torque/1000:.1f}")
-
         # --- DYNAMIC BLADE-RPM CAVITATION COUPLING ENGINE ---
         st.markdown("### ⚠️ Hydrodynamic Stability & Cavitation Matrix")
 
