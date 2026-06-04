@@ -283,6 +283,39 @@ if check_password():
             st.success(f"✅ Universal profile recorded safely with engine SFOC metrics! Saved as '{vessel_id}'")
             st.rerun()
 
+        # --- PICTORIAL APPサイドバー STYLING BLOCK INSTALLED HERE ---
+        st.markdown("---")
+        st.markdown("### 💡 Proposed Retrofit Engineering Explanations")
+        st.markdown(
+            """
+            <div style="background-color: #1e2630; padding: 15px; border-radius: 8px; border-left: 5px solid #2196F3; margin-bottom: 15px;">
+                <h4 style="color: #2196F3; margin-top: 0; margin-bottom: 5px; font-size: 15px;">⚙️ 1. Propeller Blade Solidity Upgrade</h4>
+                <p style="font-size: 12px; color: #cccccc; margin: 0;">
+                    <b>Existing Baseline:</b> Standard 4-Blade Hub (High concentrated tip loading).<br>
+                    <b>Proposed Solution:</b> Parabolic Unloaded Skew Profile (High surface area balance).<br>
+                    <span style="color: #4CAF50;"><b>🎨 Visual Benefit:</b> Spreads hydro-thrust loads evenly to completely eliminate sheet cavitation.</span>
+                </p>
+            </div>
+            <div style="background-color: #1e2630; padding: 15px; border-radius: 8px; border-left: 5px solid #00BCD4; margin-bottom: 15px;">
+                <h4 style="color: #00BCD4; margin-top: 0; margin-bottom: 5px; font-size: 15px;">🧬 2. Asymmetric Foil Alignment</h4>
+                <p style="font-size: 12px; color: #cccccc; margin: 0;">
+                    <b>Existing Baseline:</b> Symmetric Flat-Plate Rudder (Creates trailing fluid drag).<br>
+                    <b>Proposed Solution:</b> Curved Leading-Edge Twisted Sections.<br>
+                    <span style="color: #4CAF50;"><b>🎨 Visual Benefit:</b> Intercepts chaotic propeller vortex rotational fluid and turns it into forward thrust.</span>
+                </p>
+            </div>
+            <div style="background-color: #1e2630; padding: 15px; border-radius: 8px; border-left: 5px solid #FF9800; margin-bottom: 5px;">
+                <h4 style="color: #FF9800; margin-top: 0; margin-bottom: 5px; font-size: 15px;">🎯 3. Wake Equalization Hub Coupling</h4>
+                <p style="font-size: 12px; color: #cccccc; margin: 0;">
+                    <b>Existing Baseline:</b> Empty low-pressure pocket trailing behind boss cap cap.<br>
+                    <b>Proposed Solution:</b> Hydro-Cooptimized Integrated Rudder Bulb.<br>
+                    <span style="color: #4CAF50;"><b>🎨 Visual Benefit:</b> Streamlines the hub flow bypass to completely clear remaining core vortex resistance.</span>
+                </p>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
     # --- HYDRODYNAMIC MATHEMATICAL ENGINES ---
     base_prop_eff = 0.68 + (0.02 * (4 - blade_count))
     rudder_area = rudder_span * rudder_chord
