@@ -279,16 +279,23 @@ if check_password():
         for j in range(0, len(rx), 2):
             fig3d.add_trace(go.Scatter3d(x=rx[j:j+2], y=ry[j:j+2], z=rz[j:j+2], mode='lines', line=dict(color='cyan', width=2), showlegend=False))
 
-        fig3d.update_layout(template="plotly_dark", height=380, margin=dict(l=0, r=0, b=0, t=0),
+        fig3d.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, b=0, t=0),
                             scene=dict(xaxis_title="X (Chord/Trans)", yaxis_title="Y (Thickness)", zaxis_title="Z (Span Height)"))
         st.plotly_chart(fig3d, use_container_width=True)
 
-        # --- FIXED MODULE: DYNAMIC INTELLIGENT CAVITATION MATRIX ---
+        # --- DYNAMIC BLADE-RPM CAVITATION COUPLING ENGINE ---
         st.markdown("### ⚠️ Hydrodynamic Stability & Cavitation Matrix")
 
         v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
-        estimated_rpm = (v_advance * 60) / (diameter * 0.65)
+
+        # DYNAMIC PHYSICS MODIFIER: Higher blade count drops required shaft RPM to push same thrust loading
+        # Baseline template assumes standard 4-blade performance index.
+        rpm_blade_modifier = 1.0 - (0.075 * (blade_count - 4))
+
+        estimated_rpm = ((v_advance * 60) / (diameter * 0.65)) * rpm_blade_modifier
         rps = estimated_rpm / 60.0
+
+        # Recalculate true responsive tip speed: V = pi * D * n
         tip_speed = np.pi * diameter * rps
 
         st.write(f"**Calculated Propeller Tip Speed:** `{tip_speed:.1f} m/s` | **Estimated Operational Shaft Rotation:** `{estimated_rpm:.1f} RPM`")
@@ -296,19 +303,18 @@ if check_password():
         c1, c2 = st.columns(2)
         with c1:
             if tip_speed < 36.0:
-                st.success("🟢 **Tip Velocity Boundary: SAFE**\n\nLocal shear velocities sit securely below cavitation limits. Low risk of structural pressure pulses.")
+                st.success(f"🟢 **Tip Velocity Boundary: SAFE ({tip_speed:.1f} m/s)**\n\nLocal shear velocities sit securely below cavitation limits. Low risk of structural pressure pulses.")
             elif tip_speed <= 43.0:
-                # --- DYNAMIC ADVICE LOGIC INTEGRATED HERE ---
                 if blade_count < 5:
-                    advice_text = "Consider shifting to a 5 or 6-blade profile to reduce required loading diameter and drop local tip velocities."
+                    advice_text = "Consider shifting to a 5 or 6-blade profile to drop required shaft RPM and lower localized tip speed."
                 elif blade_count == 5:
-                    advice_text = "Already optimized to 5 blades. Consider a minor reduction in tip diameter or drop maximum service speed by 0.5 knots to clear transition thresholds."
+                    advice_text = "Already optimized to 5 blades. Consider shifting to 6 blades, reducing diameter by 0.2m, or decreasing maximum service speed to clear transition thresholds."
                 else:
-                    advice_text = "Already utilizing a high-solidity 6-blade configuration. To lower tip speed further, slightly decrease total propeller tip diameter or verify blade sections feature anti-cavitation trailing edge details."
+                    advice_text = "Utilizing high-solidity 6-blade configuration. To lower tip speed further, slightly shave propeller diameter or apply trailing-edge boundary thickness modifications."
 
-                st.warning(f"🟡 **Tip Velocity Boundary: MARGINAL EROSION RISK**\n\nTip velocities crossing into the transition zone. Minor sheet cavitation likely at top quadrant position. {advice_text}")
+                st.warning(f"🟡 **Tip Velocity Boundary: MARGINAL EROSION RISK ({tip_speed:.1f} m/s)**\n\nTip velocities crossing into transition zone. Minor sheet cavitation likely. {advice_text}")
             else:
-                st.error("🔴 **Tip Velocity Boundary: CAVITATION CRITICAL**\n\nSevere localized boiling threshold exceeded! High potential for surface pitting, blade material erosion, and severe hull vibration noise. Reduce design speed, power density, or decrease diameter.")
+                st.error(f"🔴 **Tip Velocity Boundary: CAVITATION CRITICAL ({tip_speed:.1f} m/s)**\n\nSevere localized boiling threshold exceeded! Material erosion, cavitation pitting, and intense hull vibration risk. Increase blade count, decrease diameter, or drop speed targets.")
 
         with c2:
             loading_index = (baseline_power) / (blade_count * (diameter**2))
