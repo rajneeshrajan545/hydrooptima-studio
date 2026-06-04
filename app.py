@@ -31,19 +31,20 @@ def init_db():
             rudder_type TEXT,
             rudder_span REAL,
             rudder_chord REAL,
-            naca_thickness REAL
+            naca_thickness REAL,
+            sfoc REAL
         )
     """)
     conn.commit()
     conn.close()
 
-def save_project(p_id, client, v_type, speed, wake, thrust, power, dwt, diam, fuel, days, b_count, h_ratio, p_law, r_type, r_span, r_chord, r_thick):
+def save_project(p_id, client, v_type, speed, wake, thrust, power, dwt, diam, fuel, days, b_count, h_ratio, p_law, r_type, r_span, r_chord, r_thick, sfoc_val):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT OR REPLACE INTO projects 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (p_id, client, v_type, speed, wake, thrust, power, dwt, diam, fuel, days, b_count, h_ratio, p_law, r_type, r_span, r_chord, r_thick))
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (p_id, client, v_type, speed, wake, thrust, power, dwt, diam, fuel, days, b_count, h_ratio, p_law, r_type, r_span, r_chord, r_thick, sfoc_val))
     conn.commit()
     conn.close()
 
@@ -55,10 +56,8 @@ def get_all_projects():
 
 init_db()
 
-# --- IMO CII REFERENCE COEFFICIENTS MATRIX ---
+# --- CALIBRATED IMO CII REFERENCE COEFFICIENTS ---
 def get_imo_parameters(vessel_type):
-    # Returns (a, c) coefficients representing the standard IMO reference lines for different hull form categories
-    # Formulation: Baseline Ref = a * (DWT) ** (-c)
     mapping = {
         "Bulk Carrier": (961.79, 0.477),
         "Tanker": (5222.50, 0.381),
@@ -69,21 +68,16 @@ def get_imo_parameters(vessel_type):
 
 # --- GENERATIVE MATHEMATICAL HYDRODYNAMIC ENGINES ---
 def generate_universal_rudder(rudder_type, span, chord, thick_ratio):
-    """Generates 3D spatial coordinate arrays using universal NACA definitions."""
     z_nodes = np.linspace(0, span, 12)
     x_nodes = np.linspace(0, chord, 10)
-
     x_coords, y_coords, z_coords = [], [], []
 
     for z in z_nodes:
-        # Check if asymmetric twisted leading edge is selected
         twist = 0.0
         if rudder_type == "Asymmetric Twisted Leading-Edge":
-            # Introduce a sinusoidal twist distribution along the span height (Z)
             twist = 0.08 * chord * np.sin((z / span) * np.pi * 2)
 
         for x in x_nodes:
-            # Standard NACA 4-Digit thickness distribution formula
             pos_x = x / chord
             y_thick = (thick_ratio / 0.2) * chord * (
                 0.2969 * np.sqrt(pos_x) - 
@@ -92,19 +86,12 @@ def generate_universal_rudder(rudder_type, span, chord, thick_ratio):
                 0.2843 * (pos_x**3) - 
                 0.1015 * (pos_x**4)
             )
+            if rudder_type == "Schilling / Flapped High-Lift" and pos_x > 0.85:
+                y_thick += (pos_x - 0.85) * chord * 0.15
 
-            # Apply offsets based on rudder type variables
-            if rudder_type == "Schilling / Flapped High-Lift":
-                # Flare the trailing edge nodes outwards
-                if pos_x > 0.85:
-                    y_thick += (pos_x - 0.85) * chord * 0.15
-
-            # Positive profile half
             x_coords.append(x + twist)
             y_coords.append(y_thick)
             z_coords.append(z)
-
-            # Negative profile half
             x_coords.append(x + twist)
             y_coords.append(-y_thick)
             z_coords.append(z)
@@ -112,26 +99,17 @@ def generate_universal_rudder(rudder_type, span, chord, thick_ratio):
     return np.array(x_coords), np.array(y_coords), np.array(z_coords)
 
 def generate_universal_propeller(diameter, hub_ratio, blades, pitch_law, wake_fraction):
-    """Generates multi-blade 3D parametric tracks dynamically adjusting to radial distribution curves."""
     radius = diameter / 2.0
     r_hub = radius * hub_ratio
-
     x_coords, y_coords, z_coords = [], [], []
 
-    # Process geometry calculations across each custom blade angle offset
     for b in range(blades):
         blade_angle_offset = (2 * np.pi / blades) * b
-
-        # Calculate 5 distinct radial section steps from hub to tip
         for r_step in np.linspace(r_hub, radius, 5):
             normalized_r = r_step / radius
-
-            # Calculate local pitch factor based on chosen hydrodynamic distribution law
             if pitch_law == "Parabolic (Reduced Tip & Hub Loading)":
-                # Parabolic reduction profile optimizing cavitation performance at tips
                 pitch_factor = (1.0 - 0.15 * (normalized_r - 0.7)**2) * (1.0 - wake_fraction)
             else:
-                # Standard Linear Distribution
                 pitch_factor = (1.1 - 0.2 * normalized_r) * (1.0 - wake_fraction)
 
             theta = np.linspace(0, np.pi / 2, 8) + blade_angle_offset
@@ -174,12 +152,13 @@ if check_password():
     st.markdown("### 🗃️ Enterprise Knowledge Base")
     saved_df = get_all_projects()
 
-    # Initialize global fallbacks
+    # Global default initializations including the new sfoc variable
     s_val, w_val, t_val, p_val = 13.0, 0.296, 0.201, 3401.0
     dwt_val, diam_val, fuel_val, days_val = 82000.0, 6.8, 650.0, 220.0
     b_count, h_ratio, p_law = 4, 0.22, "Parabolic (Reduced Tip & Hub Loading)"
     r_type, r_span, r_chord, r_thick = "Asymmetric Twisted Leading-Edge", 7.5, 4.2, 0.18
     client_val, id_val, vtype_val = "Global Maritime Fleet", "Project Eco-Bulk 01", "Bulk Carrier"
+    sfoc_default = 185.0
 
     selected_project = "New Project Configuration"
     is_loaded = False
@@ -197,6 +176,8 @@ if check_password():
             b_count, h_ratio, p_law = int(p_data['blade_count']), float(p_data['hub_ratio']), str(p_data['pitch_law'])
             r_type, r_span, r_chord, r_thick = str(p_data['rudder_type']), float(p_data['rudder_span']), float(p_data['rudder_chord']), float(p_data['naca_thickness'])
             client_val, id_val, vtype_val = str(p_data['client_name']), str(p_data['project_id']), str(p_data['vessel_type'])
+            # Safeguard parsing for older rows that didn't have SFOC columns initialized
+            sfoc_default = float(p_data['sfoc']) if 'sfoc' in p_data else 185.0
             st.success(f"Successfully loaded parameters for saved profile: **{selected_project}**!")
 
     st.markdown("---")
@@ -231,20 +212,24 @@ if check_password():
         v_knots = st.slider("Design Service Speed (Knots)", 10.0, 22.0, s_val, 0.5)
         w_fraction = st.slider("Taylor Wake Fraction (w)", 0.100, 0.400, w_val, 0.001)
         t_deduction = st.slider("Thrust Deduction Factor (t)", 0.100, 0.300, t_val, 0.001)
+
         baseline_power = st.number_input("Baseline Installed Shaft Power (kW)", value=p_val)
+        # ADD INTERACTIVE VARIABLE SFOC ENTRY HERE
+        sfoc_input = st.number_input("Specific Fuel Oil Consumption - SFOC (g/kW-h)", value=sfoc_default, step=1.0)
+
         fuel_cost = st.number_input("Fuel Cost (USD / Metric Ton)", value=fuel_val)
         op_days = st.number_input("Annual Days Operational at Sea", value=days_val)
 
         st.markdown("---")
         if st.button("💾 Commit Universal Parameters to Database"):
-            save_project(vessel_id, client_name, vessel_type, v_knots, w_fraction, t_deduction, baseline_power, vessel_dwt, diameter, fuel_cost, op_days, blade_count, hub_ratio, pitch_law, rudder_type, rudder_span, rudder_chord, naca_thickness)
-            st.success(f"✅ Universal profile recorded safely! Saved as '{vessel_id}'")
+            save_project(vessel_id, client_name, vessel_type, v_knots, w_fraction, t_deduction, baseline_power, vessel_dwt, diameter, fuel_cost, op_days, blade_count, hub_ratio, pitch_law, rudder_type, rudder_span, rudder_chord, naca_thickness, sfoc_input)
+            st.success(f"✅ Universal profile recorded safely with engine SFOC metrics! Saved as '{vessel_id}'")
             st.rerun()
 
-    # Core Performance & Hydrodynamic Scaling Calculations
+    # Core Performance & Hydrodynamic Scaling Calculations using CUSTOM sfoc_input
     baseline_efficiency = 0.68 + (0.02 * (4 - blade_count))
     optimized_efficiency = baseline_efficiency + 0.046  
-    sfc = 0.185 / 1000.0  
+    sfc = sfoc_input / 1000.0 / 1000.0  # Convert g/kW-h cleanly to Metric Tons/kW-h
 
     daily_baseline_fuel = baseline_power * 24 * sfc
     efficiency_ratio = baseline_efficiency / optimized_efficiency
@@ -261,12 +246,13 @@ if check_password():
     annual_co2_opt = daily_optimized_fuel * co2_factor * op_days
     annual_co2_saved = max(annual_co2_base - annual_co2_opt, 0.0)
 
-    # Calculate CII using universal dynamic reference lines
-    cii_baseline = (annual_co2_base * 10**6) / (vessel_dwt * annual_dist)
-    cii_optimized = (annual_co2_opt * 10**6) / (vessel_dwt * annual_dist)
+    # --- CALIBRATED MARITIME SCALING FOR CII METRICS ---
+    capacity_factor = vessel_dwt if vessel_type != "LNG Carrier" else vessel_dwt * 0.48
+    cii_baseline = (annual_co2_base * 10**6) / (capacity_factor * annual_dist)
+    cii_optimized = cii_baseline * (daily_optimized_fuel / daily_baseline_fuel)
 
     a_coeff, c_coeff = get_imo_parameters(vessel_type)
-    cii_reference_baseline = a_coeff * (vessel_dwt ** (-c_coeff))
+    cii_reference_baseline = a_coeff * (capacity_factor ** (-c_coeff))
 
     with col2:
         st.header("📊 Executive Optimization Summary")
@@ -279,14 +265,10 @@ if check_password():
         st.subheader("🔮 Real-Time Universal Geometry Preview")
 
         fig3d = go.Figure()
-
-        # Calculate and plot universal propeller curves
         px, py, pz = generate_universal_propeller(diameter, hub_ratio, blade_count, pitch_law, w_fraction)
-        # Reshape or iterate coordinates to group lines properly for rendering
         for i in range(0, len(px), 8):
             fig3d.add_trace(go.Scatter3d(x=px[i:i+8], y=py[i:i+8], z=pz[i:i+8], mode='lines', line=dict(color='orange', width=4), showlegend=False))
 
-        # Calculate and plot universal NACA rudder coordinate clouds
         rx, ry, rz = generate_universal_rudder(rudder_type, rudder_span, rudder_chord, naca_thickness)
         for j in range(0, len(rx), 2):
             fig3d.add_trace(go.Scatter3d(x=rx[j:j+2], y=ry[j:j+2], z=rz[j:j+2], mode='lines', line=dict(color='cyan', width=2), showlegend=False))
@@ -300,19 +282,20 @@ if check_password():
         st.write(f"Evaluating specific compliance threshold lines mapped for **{vessel_type}** profiles using standard IMO coefficients.")
 
         years = np.array([2026, 2027, 2028, 2029, 2030])
-        # Track tightening required profiles
-        cii_required_c = np.array([cii_reference_baseline * 0.95, cii_reference_baseline * 0.91, cii_reference_baseline * 0.87, cii_reference_baseline * 0.83, cii_reference_baseline * 0.79])
-        cii_required_e = cii_required_c * 1.15
+        reduction_factors = np.array([0.05, 0.07, 0.09, 0.11, 0.13])
+        cii_required_c = cii_reference_baseline * (1.0 - reduction_factors)
+        cii_required_e = cii_required_c * 1.28
 
         fig_cii = go.Figure()
-        fig_cii.add_trace(go.Scatter(x=years, y=cii_required_c, mode='lines', name='IMO C-Target Line', line=dict(color='green', dash='dash')))
-        fig_cii.add_trace(go.Scatter(x=years, y=cii_required_e, mode='lines', name='IMO E-Violation Line', line=dict(color='red', dash='dash')))
+        fig_cii.add_trace(go.Scatter(x=years, y=cii_required_c, mode='lines', name='IMO Target Line (C-Rating Threshold)', line=dict(color='orange', dash='dash')))
+        fig_cii.add_trace(go.Scatter(x=years, y=cii_required_e, mode='lines', name='IMO Boundary Line (Critical E-Violation)', line=dict(color='red', dash='dash')))
+
         fig_cii.add_trace(go.Scatter(x=years, y=[cii_baseline]*5, mode='lines+markers', name='Unmodified Status Quo', line=dict(color='crimson', width=3)))
         fig_cii.add_trace(go.Scatter(x=years, y=[cii_optimized]*5, mode='lines+markers', name='With Optimized Integration', line=dict(color='limegreen', width=4)))
 
-        fig_cii.update_layout(template="plotly_dark", height=300, margin=dict(l=40, r=20, b=30, t=20),
+        fig_cii.update_layout(template="plotly_dark", height=320, margin=dict(l=40, r=20, b=30, t=20),
                             xaxis=dict(tickmode='array', tickvals=years), yaxis_title="Attained CII (g-CO2 / DWT-Mile)",
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                            legend=dict(orientation="h", yanchor="bottom", y=102, xanchor="right", x=1))
         st.plotly_chart(fig_cii, use_container_width=True)
 
         st.success(f"⚖️ **Compliance Advantage:** Integrating the optimized design package cuts carbon emissions by **{annual_co2_saved:.1f} tons** annually, directly improving the vessel's attained operational rating curve relative to official IMO parameters.")
