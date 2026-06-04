@@ -369,24 +369,41 @@ if check_password():
 
       # --- CAVITATION & TORQUE MATRIX ---
         st.markdown("---")
+        st.subheader("⚠️ Cavitation & Torque Matrix")
         
-        # 1. AUTOPILOT CONDITIONALS (Define all variables first)
-        if auto_optimize:
-            calc_diam, calc_blades = optimized_diameter, optimized_blades
-            calc_span, calc_chord, calc_thick = optimized_span, optimized_chord, optimized_thickness
-        else:
-            calc_diam, calc_blades = diameter, blade_count
-            calc_span, calc_chord, calc_thick = rudder_span, rudder_chord, naca_thickness
+        # 1. ALWAYS initialize variables to avoid UnboundLocalError
+        calc_diam = diameter
+        calc_blades = blade_count
+        calc_span = rudder_span
+        calc_chord = rudder_chord
+        calc_thick = naca_thickness
 
-        # 2. CALCULATION ENGINE
+        # 2. OVERRIDE with Autopilot values if active
+        if auto_optimize:
+            calc_diam = optimized_diameter
+            calc_blades = optimized_blades
+            calc_span = optimized_span
+            calc_chord = optimized_chord
+            calc_thick = optimized_thickness
+
+        # 3. CALCULATION ENGINE
         v_adv = v_knots * 0.5144 * (1.0 - w_fraction)
         est_rpm = ((v_adv * 60) / (calc_diam * 0.65)) * (1.0 - (0.075 * (calc_blades - 4)))
         J_curr = v_adv / ((est_rpm/60.0) * calc_diam)
         Kt_curr = baseline_power / (1025 * (est_rpm/60.0)**3 * (calc_diam**5))
         
-        # 3. UI DISPLAY
-        st.subheader("⚠️ Cavitation & Torque Matrix")
+        # 4. UI DISPLAY
         J_lim, Kt_lim = get_cavitation_bucket_data()
+        
+        fig_b = go.Figure()
+        fig_b.add_trace(go.Scatter(x=J_lim, y=Kt_lim, name='Inception Boundary', line=dict(color='yellow', dash='dash')))
+        fig_b.add_trace(go.Scatter(x=[J_curr], y=[Kt_curr], mode='markers', name='Design Point', marker=dict(size=12, color='red')))
+        fig_b.update_layout(template="plotly_dark", height=250, margin=dict(l=20,r=20,b=20,t=20), 
+                            xaxis_title="Advance Ratio (J)", yaxis_title="Thrust Coefficient (Kt)")
+        st.plotly_chart(fig_b, use_container_width=True)
+        
+        trq = 0.5 * 1025 * (v_knots * 0.5144)**2 * (calc_chord**2) * calc_span * 0.05 * calc_thick
+        st.metric("Estimated Rudder Stock Torque (kNm)", f"{trq/1000:.1f}")
         
         fig_b = go.Figure()
         fig_b.add_trace(go.Scatter(x=J_lim, y=Kt_lim, name='Inception Boundary', line=dict(color='yellow', dash='dash')))
