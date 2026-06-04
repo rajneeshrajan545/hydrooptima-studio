@@ -161,7 +161,6 @@ if check_password():
     st.markdown("### 🗃️ Enterprise Knowledge Base")
     saved_df = get_all_projects()
 
-    # Initialize dictionary parameters directly into standard fallback references
     init_s, init_w, init_t, init_p = 13.0, 0.296, 0.201, 3401.0
     init_dwt, init_diam, init_fuel, init_days = 82000.0, 6.8, 650.0, 220.0
     init_b, init_hr, init_pl = 4, 0.22, "Parabolic (Reduced Tip & Hub Loading)"
@@ -212,9 +211,11 @@ if check_password():
                     if 'Diameter' in csv_df.columns: init_diam = float(csv_df['Diameter'].iloc[0])
                     if 'Blades' in csv_df.columns: init_b = int(csv_df['Blades'].iloc[0])
                     if 'SFOC' in csv_df.columns: init_sfoc = float(csv_df['SFOC'].iloc[0])
-                    st.success("🎯 Towing tank configurations mapped successfully into core memory!")
+                    st.success("🎯 Towing tank configuration parameters loaded successfully!")
                 except Exception as e:
-                    st.error(f"Failed to read CSV payload columns: {e}")
+                    st.error(f"Failed to parse CSV columns: {e}")
+            else:
+                st.warning("ℹ️ Formatting Guide: Ensure your CSV file includes row headers named exactly: 'Speed', 'Wake', 'Thrust_Deduction', 'Power', 'DWT', 'Diameter', 'Blades', 'SFOC'.")
 
         st.markdown("---")
         st.subheader("⚙️ Propeller Generative Criteria")
@@ -248,17 +249,18 @@ if check_password():
             st.success(f"✅ Universal profile recorded safely with engine SFOC metrics! Saved as '{vessel_id}'")
             st.rerun()
 
-    # --- 🔒 PIPELINE ENGINE CALCULATIONS LAYER (No session state decoupling locks) ---
+    # --- 🔒 MATHEMATICAL HYDRODYNAMIC ENGINES (linked directly to live widget variables) ---
     base_prop_eff = 0.68 + (0.02 * (4 - blade_count))
     rudder_area = rudder_span * rudder_chord
 
-    # Process lift/drag vector equations using live active slider metrics
-    swirl_recovery_gain = 0.0035 * rudder_area * (1.25 if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.85)
-    rudder_drag_penalty = 0.0048 * rudder_area * (naca_thickness / 0.18)
-    rudder_efficiency_gain = max(swirl_recovery_gain - rudder_drag_penalty, 0.012)
+    # Dynamic swirl energy recovery coefficient loop
+    swirl_recovery_gain = 0.0085 * rudder_area * (1.25 if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.85)
+    rudder_drag_penalty = 0.0092 * rudder_area * (naca_thickness / 0.18)
+    rudder_efficiency_gain = max(swirl_recovery_gain - rudder_drag_penalty, 0.015)
 
     opt_prop_eff = base_prop_eff + rudder_efficiency_gain
 
+    # Fuel loop bound directly to baseline_power input
     sfc_tons = sfoc_input / 1000.0 / 1000.0  
     daily_baseline_fuel = baseline_power * 24 * sfc_tons
     daily_optimized_fuel = (baseline_power * (base_prop_eff / opt_prop_eff)) * 24 * sfc_tons
