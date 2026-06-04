@@ -161,11 +161,11 @@ if check_password():
     st.markdown("### 🗃️ Enterprise Knowledge Base")
     saved_df = get_all_projects()
 
-    # 1. Setup Session States to Prevent Overwrite Loop Cache Lock
+    # Standardized key strings initialization to completely fix AttributeError matches
     if "s_val" not in st.session_state:
         st.session_state.s_val, st.session_state.w_val, st.session_state.t_val, st.session_state.p_val = 13.0, 0.296, 0.201, 3401.0
         st.session_state.dwt_val, st.session_state.diam_val, st.session_state.fuel_val, st.session_state.days_val = 82000.0, 6.8, 650.0, 220.0
-        st.session_state.b_count, st.session_state.h_ratio, st.session_state.p_law = 4, 0.22, "Parabolic (Reduced Tip & Hub Loading)"
+        st.session_state.b_count, st.session_state.hub_ratio, st.session_state.p_law = 4, 0.22, "Parabolic (Reduced Tip & Hub Loading)"
         st.session_state.r_type, st.session_state.r_span, st.session_state.r_chord, st.session_state.r_thick = "Asymmetric Twisted Leading-Edge", 7.5, 4.2, 0.18
         st.session_state.client_val, st.session_state.id_val, st.session_state.vtype_val = "Global Maritime Fleet", "Project Eco-Bulk 01", "Bulk Carrier"
         st.session_state.sfoc_default = 185.0
@@ -179,7 +179,7 @@ if check_password():
             st.session_state.s_val, st.session_state.w_val, st.session_state.t_val = float(p_data['speed']), float(p_data['wake_fraction']), float(p_data['thrust_deduction'])
             st.session_state.p_val, st.session_state.dwt_val, st.session_state.diam_val = float(p_data['power']), float(p_data['dwt']), float(p_data['diameter'])
             st.session_state.fuel_val, st.session_state.days_val, st.session_state.b_count = float(p_data['fuel_cost']), float(p_data['op_days']), int(p_data['blade_count'])
-            st.session_state.h_ratio, st.session_state.p_law, st.session_state.r_type = float(p_data['hub_ratio']), str(p_data['pitch_law']), str(p_data['rudder_type'])
+            st.session_state.hub_ratio, st.session_state.p_law, st.session_state.r_type = float(p_data['hub_ratio']), str(p_data['pitch_law']), str(p_data['rudder_type'])
             st.session_state.r_span, st.session_state.r_chord, st.session_state.r_thick = float(p_data['rudder_span']), float(p_data['rudder_chord']), float(p_data['naca_thickness'])
             st.session_state.client_val, st.session_state.id_val, st.session_state.vtype_val = str(p_data['client_name']), str(p_data['project_id']), str(p_data['vessel_type'])
             st.session_state.sfoc_default = float(p_data['sfoc']) if 'sfoc' in p_data else 185.0
@@ -255,15 +255,13 @@ if check_password():
             st.session_state.clear()
             st.rerun()
 
-    # --- 🔒 PIPELINE ENGINE CALCULATIONS LAYER (Positioned below widget captures) ---
+    # --- Hydrodynamic Energy Recovery Backend Processing ---
     base_prop_eff = 0.68 + (0.02 * (4 - blade_count))
     rudder_area = rudder_span * rudder_chord
 
-    # Calculate dimensional coefficients from slider states
     swirl_recovery_gain = 0.0035 * rudder_area * (1.25 if rudder_type == "Asymmetric Twisted Leading-Edge" else 0.85)
     rudder_drag_penalty = 0.0048 * rudder_area * (naca_thickness / 0.18)
     rudder_efficiency_gain = max(swirl_recovery_gain - rudder_drag_penalty, 0.012)
-
     opt_prop_eff = base_prop_eff + rudder_efficiency_gain
 
     sfc_tons = sfoc_input / 1000.0 / 1000.0  
@@ -300,7 +298,6 @@ if check_password():
         fig3d = go.Figure()
         px, py, pz = generate_universal_propeller(diameter, hub_ratio, blade_count, pitch_law, w_fraction)
         for i in range(0, len(px), 8):
-            # --- TYPO CORRECTED HERE FROM pz= TO z= TO RESTORE INTERFACE ---
             fig3d.add_trace(go.Scatter3d(x=px[i:i+8], y=py[i:i+8], z=pz[i:i+8], mode='lines', line=dict(color='orange', width=4), showlegend=False))
 
         rx, ry, rz = generate_universal_rudder(rudder_type, rudder_span, rudder_chord, naca_thickness)
@@ -326,29 +323,21 @@ if check_password():
         c1, c2 = st.columns(2)
         with c1:
             if tip_speed < 36.0:
-                st.success(f"🟢 **Tip Velocity Boundary: SAFE ({tip_speed:.1f} m/s)**\n\nLocal shear velocities sit securely below cavitation limits. Low risk of structural pressure pulses.")
+                st.success(f"🟢 **Tip Velocity Boundary: SAFE ({tip_speed:.1f} m/s)**\n\nLocal shear velocities sit securely below cavitation limits.")
             elif tip_speed <= 43.0:
-                if blade_count < 5:
-                    advice_text = "Consider shifting to a 5 or 6-blade profile to drop required shaft RPM and lower localized tip speed."
-                elif blade_count == 5:
-                    advice_text = "Already optimized to 5 blades. Consider shifting to 6 blades, reducing diameter by 0.2m, or decreasing maximum service speed to clear transition thresholds."
-                else:
-                    advice_text = "Utilizing high-solidity 6-blade configuration. To lower tip speed further, slightly shave propeller diameter or apply trailing-edge boundary thickness modifications."
-
-                st.warning(f"🟡 **Tip Velocity Boundary: MARGINAL EROSION RISK ({tip_speed:.1f} m/s)**\n\nTip velocities crossing into transition zone. Minor sheet cavitation likely. {advice_text}")
+                st.warning(f"🟡 **Tip Velocity Boundary: MARGINAL EROSION RISK ({tip_speed:.1f} m/s)**\n\nTip velocities crossing into transition zone.")
             else:
-                st.error(f"🔴 **Tip Velocity Boundary: CAVITATION CRITICAL ({tip_speed:.1f} m/s)**\n\nSevere localized boiling threshold exceeded! Material erosion, cavitation pitting, and intense hull vibration risk. Increase blade count, decrease diameter, or drop speed targets.")
+                st.error(f"🔴 **Tip Velocity Boundary: CAVITATION CRITICAL ({tip_speed:.1f} m/s)**\n\nSevere localized boiling threshold exceeded!")
 
         with c2:
             loading_index = (baseline_power) / (blade_count * (diameter**2))
             if loading_index < 125.0:
                 st.success("🟢 **Surface Blade Loading Profile: OPTIMAL**")
             else:
-                st.warning("🟡 **Surface Blade Loading Profile: HIGH PRESSURE VARIANCE**\n\nHigh power concentration per square meter of blade face area. Check localized thickness skew to verify trailing-edge boundary unloading.")
+                st.warning("🟡 **Surface Blade Loading Profile: HIGH PRESSURE VARIANCE**")
 
         st.markdown("---")
         st.subheader("📉 Dynamic IMO CII Regulatory Life-Extension Timeline")
-        st.write(f"Evaluating specific compliance threshold lines mapped for **{vessel_type}** profiles using standard IMO coefficients.")
 
         years = np.array([2026, 2027, 2028, 2029, 2030])
         reduction_factors = np.array([0.05, 0.07, 0.09, 0.11, 0.13])
@@ -359,7 +348,6 @@ if check_password():
         fig_cii = go.Figure()
         fig_cii.add_trace(go.Scatter(x=years, y=cii_required_c, mode='lines', name='IMO Target Line (C-Rating Threshold)', line=dict(color='orange', dash='dash')))
         fig_cii.add_trace(go.Scatter(x=years, y=cii_required_e, mode='lines', name='IMO Boundary Line (Critical E-Violation)', line=dict(color='red', dash='dash')))
-
         fig_cii.add_trace(go.Scatter(x=years, y=[cii_baseline]*5, mode='lines+markers', name='Unmodified Status Quo', line=dict(color='crimson', width=3)))
         fig_cii.add_trace(go.Scatter(x=years, y=[cii_optimized]*5, mode='lines+markers', name='With Optimized Integration', line=dict(color='limegreen', width=4)))
 
@@ -370,7 +358,6 @@ if check_password():
 
         st.markdown("---")
         st.subheader("🛠️ Production-Ready Data Export")
-
         csv_data = f"# HYDROOPTIMA AI STUDIO - GEOMETRY PACKAGE\n# CLIENT: {client_name} | ID: {vessel_id}\n"
         clean_file_name = f"{vessel_id.replace(' ', '_')}_HydroOptima_Design.xyz"
         st.download_button(label="📥 Export .XYZ Production Coordinate Package", data=csv_data, file_name=clean_file_name, mime="text/plain")
