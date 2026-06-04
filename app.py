@@ -131,11 +131,7 @@ def generate_universal_propeller(diameter, hub_ratio, blades, pitch_law, wake_fr
             z_coords.extend(pz)
 
     return np.array(x_coords), np.array(y_coords), np.array(z_coords)
-def get_cavitation_bucket_data():
-    J = np.linspace(0.3, 1.2, 50)
-    Kt = 0.08 * (J - 0.2)**2 + 0.02
-    return J, Kt
-    
+
 # --- SECURITY ENTRY PORTAL ---
 def check_password():
     if "password_correct" not in st.session_state:
@@ -367,81 +363,8 @@ if check_password():
                             scene=dict(xaxis_title="X (Chord/Trans)", yaxis_title="Y (Thickness)", zaxis_title="Z (Span Height)"))
         st.plotly_chart(fig3d, use_container_width=True)
 
-      # --- CAVITATION & TORQUE MATRIX ---
-        st.markdown("---")
-        st.subheader("⚠️ Cavitation & Torque Matrix")
-        
-        # 1. ALWAYS initialize variables to avoid UnboundLocalError
-        calc_diam = diameter
-        calc_blades = blade_count
-        calc_span = rudder_span
-        calc_chord = rudder_chord
-        calc_thick = naca_thickness
-
-        # 2. OVERRIDE with Autopilot values if active
-        if auto_optimize:
-            calc_diam = optimized_diameter
-            calc_blades = optimized_blades
-            calc_span = optimized_span
-            calc_chord = optimized_chord
-            calc_thick = optimized_thickness
-
-        # 3. CALCULATION ENGINE
-        v_adv = v_knots * 0.5144 * (1.0 - w_fraction)
-        est_rpm = ((v_adv * 60) / (calc_diam * 0.65)) * (1.0 - (0.075 * (calc_blades - 4)))
-        J_curr = v_adv / ((est_rpm/60.0) * calc_diam)
-        Kt_curr = baseline_power / (1025 * (est_rpm/60.0)**3 * (calc_diam**5))
-        
-        # 4. UI DISPLAY
-        J_lim, Kt_lim = get_cavitation_bucket_data()
-        
-        fig_b = go.Figure()
-        fig_b.add_trace(go.Scatter(x=J_lim, y=Kt_lim, name='Inception Boundary', line=dict(color='yellow', dash='dash')))
-        fig_b.add_trace(go.Scatter(x=[J_curr], y=[Kt_curr], mode='markers', name='Design Point', marker=dict(size=12, color='red')))
-        fig_b.update_layout(template="plotly_dark", height=250, margin=dict(l=20,r=20,b=20,t=20), 
-                            xaxis_title="Advance Ratio (J)", yaxis_title="Thrust Coefficient (Kt)")
-        st.plotly_chart(fig_b, use_container_width=True)
-        
-        trq = 0.5 * 1025 * (v_knots * 0.5144)**2 * (calc_chord**2) * calc_span * 0.05 * calc_thick
-        st.metric("Estimated Rudder Stock Torque (kNm)", f"{trq/1000:.1f}")
-        
-        fig_b = go.Figure()
-        fig_b.add_trace(go.Scatter(x=J_lim, y=Kt_lim, name='Inception Boundary', line=dict(color='yellow', dash='dash')))
-        fig_b.add_trace(go.Scatter(x=[J_curr], y=[Kt_curr], mode='markers', name='Design Point', marker=dict(size=12, color='red')))
-        fig_b.update_layout(template="plotly_dark", height=250, margin=dict(l=20,r=20,b=20,t=20), 
-                            xaxis_title="Advance Ratio (J)", yaxis_title="Thrust Coefficient (Kt)")
-        st.plotly_chart(fig_b, use_container_width=True)
-        
-        trq = 0.5 * 1025 * (v_knots * 0.5144)**2 * (calc_chord**2) * calc_span * 0.05 * calc_thick
-        st.metric("Estimated Rudder Stock Torque (kNm)", f"{trq/1000:.1f}")
-        
-        # USE AUTOPILOT VALUES IF ACTIVE, ELSE USE SLIDER VALUES
-        calc_diam = optimized_diameter if auto_optimize else diameter
-        calc_blades = optimized_blades if auto_optimize else blade_count
-        calc_span = optimized_span if auto_optimize else rudder_span
-        calc_chord = optimized_chord if auto_optimize else rudder_chord
-        calc_thick = optimized_thickness if auto_optimize else naca_thickness
-        
-        # Calculate Current Operational Point
-        v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
-        # Using the active diameter for RPM estimation
-        estimated_rpm = ((v_advance * 60) / (calc_diam * 0.65)) * (1.0 - (0.075 * (calc_blades - 4)))
-        
-        J_current = v_advance / ((estimated_rpm/60.0) * calc_diam)
-        Kt_current = baseline_power / (1025 * (estimated_rpm/60.0)**3 * (calc_diam**5))
-        
-        J_lim, Kt_lim = get_cavitation_bucket_data()
-        
-        fig_b = go.Figure()
-        fig_b.add_trace(go.Scatter(x=J_lim, y=Kt_lim, name='Inception Boundary', line=dict(color='yellow', dash='dash')))
-        fig_b.add_trace(go.Scatter(x=[J_current], y=[Kt_current], mode='markers', name='Design Point', marker=dict(size=12, color='red')))
-        fig_b.update_layout(template="plotly_dark", height=250, margin=dict(l=20,r=20,b=20,t=20), 
-                            xaxis_title="Advance Ratio (J)", yaxis_title="Thrust Coefficient (Kt)")
-        st.plotly_chart(fig_b, use_container_width=True)
-        
-        # Torque calculation using active design dimensions
-        torque = 0.5 * 1025 * (v_knots * 0.5144)**2 * (calc_chord**2) * calc_span * 0.05 * calc_thick
-        st.metric("Estimated Rudder Stock Torque (kNm)", f"{torque/1000:.1f}")
+        # --- DYNAMIC BLADE-RPM CAVITATION COUPLING ENGINE ---
+        st.markdown("### ⚠️ Hydrodynamic Stability & Cavitation Matrix")
 
         v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
         rpm_blade_modifier = 1.0 - (0.075 * (blade_count - 4))
