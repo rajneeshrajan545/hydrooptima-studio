@@ -161,6 +161,7 @@ if check_password():
     st.markdown("### 🗃️ Enterprise Knowledge Base")
     saved_df = get_all_projects()
 
+    # Structural default values configuration
     s_val, w_val, t_val, p_val = 13.0, 0.296, 0.201, 3401.0
     dwt_val, diam_val, fuel_val, days_val = 82000.0, 6.8, 650.0, 220.0
     b_count, h_ratio, p_law = 4, 0.22, "Parabolic (Reduced Tip & Hub Loading)"
@@ -192,13 +193,42 @@ if check_password():
 
     with col1:
         st.header("📋 Universal Project Core")
+        input_mode = st.radio("Select Data Input Method", ["Interactive Sliders", "Automated CSV Upload"])
+
         client_name = st.text_input("Client / Shipowner Identifier", value=client_val)
         vessel_id = st.text_input("Vessel Identifier / Project Code", value=id_val)
 
         v_list = ["Bulk Carrier", "Tanker", "General Cargo Ship", "LNG Carrier"]
         v_index = v_list.index(vtype_val) if vtype_val in v_list else 0
         vessel_type = st.selectbox("Vessel Hull Form Classification (CII Reference Mode)", v_list, index=v_index)
-        vessel_dwt = st.number_input("Vessel Deadweight (DWT Tons)", value=dwt_val)
+
+        # --- AUTOMATED DATA OVERWRITE PARSING MODULE ---
+        if input_mode == "Automated CSV Upload":
+            st.markdown("---")
+            st.subheader("📂 Drag & Drop Towing Tank Spreadsheet")
+            uploaded_file = st.file_uploader("Upload Model Test CSV Profile", type=["csv"])
+
+            if uploaded_file is not None:
+                try:
+                    csv_df = pd.read_csv(uploaded_file)
+                    st.success("🎯 Towing tank file parsed successfully!")
+
+                    # Map structural keys if present in CSV columns
+                    if 'Speed' in csv_df.columns: s_val = float(csv_df['Speed'].iloc[0])
+                    if 'Wake' in csv_df.columns: w_val = float(csv_df['Wake'].iloc[0])
+                    if 'Thrust_Deduction' in csv_df.columns: t_val = float(csv_df['Thrust_Deduction'].iloc[0])
+                    if 'Power' in csv_df.columns: p_val = float(csv_df['Power'].iloc[0])
+                    if 'DWT' in csv_df.columns: dwt_val = float(csv_df['DWT'].iloc[0])
+                    if 'Diameter' in csv_df.columns: diam_val = float(csv_df['Diameter'].iloc[0])
+                    if 'Blades' in csv_df.columns: b_count = int(csv_df['Blades'].iloc[0])
+                    if 'SFOC' in csv_df.columns: sfoc_default = float(csv_df['SFOC'].iloc[0])
+
+                    st.info(f"💡 AI Overwrite Loaded: Speed={s_val}kn | Power={p_val}kW | Blades={b_count}Z | SFOC={sfoc_default}g")
+                except Exception as e:
+                    st.error(f"Failed to extract structured CSV data: {e}")
+            else:
+                # Direct format template instructions block
+                st.warning("ℹ️ Formatting Guide: Ensure your CSV file includes row headers named exactly: 'Speed', 'Wake', 'Thrust_Deduction', 'Power', 'DWT', 'Diameter', 'Blades', 'SFOC'.")
 
         st.markdown("---")
         st.subheader("⚙️ Propeller Generative Criteria")
@@ -216,6 +246,7 @@ if check_password():
 
         st.markdown("---")
         st.subheader("🌊 Operational Conditions")
+        vessel_dwt = st.number_input("Vessel Deadweight (DWT Tons)", value=dwt_val)
         v_knots = st.slider("Design Service Speed (Knots)", 10.0, 22.0, s_val, 0.5)
         w_fraction = st.slider("Taylor Wake Fraction (w)", 0.100, 0.400, w_val, 0.001)
         t_deduction = st.slider("Thrust Deduction Factor (t)", 0.100, 0.300, t_val, 0.001)
@@ -287,15 +318,10 @@ if check_password():
         st.markdown("### ⚠️ Hydrodynamic Stability & Cavitation Matrix")
 
         v_advance = v_knots * 0.5144 * (1.0 - w_fraction)
-
-        # DYNAMIC PHYSICS MODIFIER: Higher blade count drops required shaft RPM to push same thrust loading
-        # Baseline template assumes standard 4-blade performance index.
         rpm_blade_modifier = 1.0 - (0.075 * (blade_count - 4))
 
         estimated_rpm = ((v_advance * 60) / (diameter * 0.65)) * rpm_blade_modifier
         rps = estimated_rpm / 60.0
-
-        # Recalculate true responsive tip speed: V = pi * D * n
         tip_speed = np.pi * diameter * rps
 
         st.write(f"**Calculated Propeller Tip Speed:** `{tip_speed:.1f} m/s` | **Estimated Operational Shaft Rotation:** `{estimated_rpm:.1f} RPM`")
